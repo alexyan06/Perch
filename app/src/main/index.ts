@@ -369,6 +369,7 @@ function createMascotWindow(sessionId: string): BrowserWindow {
     transparent: true,
     hasShadow: false,
     alwaysOnTop: true,
+    fullscreenable: false,
     resizable: false,
     movable: true,
     skipTaskbar: true,
@@ -392,6 +393,8 @@ function createMascotWindow(sessionId: string): BrowserWindow {
       contextIsolation: true,
     },
   });
+
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   // The mascot is dragged via native `-webkit-app-region: drag` (see
   // Mascot.tsx's DragHandle) rather than a custom pointer-tracked/IPC-driven
@@ -422,7 +425,7 @@ function createMascotWindow(sessionId: string): BrowserWindow {
     saveMascotPosition({ x, y });
   });
 
-  win.on("ready-to-show", () => win.show());
+  win.on("ready-to-show", () => win.showInactive());
 
   const hash = `mascot?sessionId=${encodeURIComponent(sessionId)}`;
   if (process.env["ELECTRON_RENDERER_URL"] !== undefined) {
