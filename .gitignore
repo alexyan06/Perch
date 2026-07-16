@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-electron/
+build/
+*.tsbuildinfo
+
+# Secrets — never commit
+.env
+.env.local
+*.pem
+
+# Local SQLite data
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor cruft
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+
+# Electron packaging output
+out/
+release/

@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx prettier --write \"$CODEX_FILE_PATH\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$CODEX_FILE_PATH\" in *.env|*.env.local|*.pem) echo 'Blocked: edits to secrets files are not allowed via Codex. Edit manually if intentional.' >&2; exit 1;; esac"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Perch Connector",
+  "version": "0.1.0",
+  "description": "Reports the active browser tab to the local Perch desktop app. Does not collect page content, only the active tab's URL and title.",
+  "permissions": ["tabs", "alarms"],
+  "host_permissions": [],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Perch — connection status"
+  }
+}
