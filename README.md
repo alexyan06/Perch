@@ -41,9 +41,9 @@ bubble at every stage, picked from a pool of pre-written lines so it doesn't
 repeat itself. The instant you're back on task, it resets, no lingering
 grudge.
 
-- **Repositionable.** Hover the mascot to reveal a small drag handle — grab
-  it and move it anywhere on screen, including onto a second monitor, or use
-  its menu to snap to a corner. Wherever you leave it is remembered and
+- **Repositionable.** Drag the mascot itself to move it anywhere on screen,
+  including onto a second monitor. The End session control stays beside it,
+  moving to the inward side after each drop. Wherever you leave it is remembered and
   restored next session; if that spot ever ends up on a display that's no
   longer connected, it falls back to the default corner instead of opening
   somewhere unreachable.

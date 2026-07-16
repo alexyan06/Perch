@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { GripHorizontal, X } from "lucide-react";
+import { X } from "lucide-react";
 import { pickMascotMessage, pickResetMessage } from "../mascot-messages";
+import type { MascotButtonSide } from "../../../shared/ipc";
 
 type Stage = 0 | 1 | 2 | 3;
 type BubblePlacement = "above" | "below";
@@ -154,69 +155,39 @@ function Face({ stage }: { stage: Stage }): React.JSX.Element {
   );
 }
 
-function MascotControls({
+function EndSessionButton({
   onEndSession,
 }: {
   onEndSession: () => void;
 }): React.JSX.Element {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        marginBottom: 6,
-        userSelect: "none",
+    <button
+      type="button"
+      aria-label="End session"
+      title="End session"
+      onClick={(e) => {
+        e.stopPropagation();
+        onEndSession();
       }}
+      style={
+        {
+          width: 28,
+          height: 28,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 0,
+          border: "none",
+          background: "rgba(46, 33, 21, 0.62)",
+          color: "#FFF8E7",
+          borderRadius: 6,
+          cursor: "pointer",
+          WebkitAppRegion: "no-drag",
+        } as React.CSSProperties
+      }
     >
-      <div
-        aria-label="Move mascot"
-        title="Move mascot"
-        style={
-          {
-            width: 62,
-            height: 28,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(46, 33, 21, 0.62)",
-            color: "#FFF8E7",
-            borderRadius: 6,
-            cursor: "grab",
-            WebkitAppRegion: "drag",
-          } as React.CSSProperties
-        }
-      >
-        <GripHorizontal size={18} aria-hidden="true" />
-      </div>
-      <button
-        type="button"
-        aria-label="End session"
-        title="End session"
-        onClick={(e) => {
-          e.stopPropagation();
-          onEndSession();
-        }}
-        style={
-          {
-            width: 28,
-            height: 28,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 0,
-            border: "none",
-            background: "rgba(46, 33, 21, 0.62)",
-            color: "#FFF8E7",
-            borderRadius: 6,
-            cursor: "pointer",
-            WebkitAppRegion: "no-drag",
-          } as React.CSSProperties
-        }
-      >
-        <X size={15} aria-hidden="true" />
-      </button>
-    </div>
+      <X size={15} aria-hidden="true" />
+    </button>
   );
 }
 
@@ -274,6 +245,7 @@ export function Mascot(): React.JSX.Element {
   const [activeMascot, setActiveMascot] = useState<ActiveMascot | null>(null);
   const [bubblePlacement, setBubblePlacement] =
     useState<BubblePlacement>("above");
+  const [buttonSide, setButtonSide] = useState<MascotButtonSide>("right");
   // Remembered across the nudge:clear payload, which only carries a
   // sessionId (see docs/ipc-contract.md) — the reset message still wants to
   // reference whatever task was last in play.
@@ -292,6 +264,14 @@ export function Mascot(): React.JSX.Element {
         console.error("[Mascot] getActive failed, using default:", err);
         setActiveMascot(null);
       });
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = window.api.mascot.onButtonSideChange(setButtonSide);
+    void window.api.mascot.getButtonSide().then(setButtonSide).catch((err) => {
+      console.error("[Mascot] getButtonSide failed:", err);
+    });
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -413,26 +393,47 @@ export function Mascot(): React.JSX.Element {
         paddingBottom: isBubbleBelow ? 0 : 8,
       }}
     >
-      {/* The controls are the only interactive surface while idle: the grip
-          drags the native window, and the X explicitly ends the session. */}
       <div
         data-mascot="true"
         data-stage={stage}
         style={{
           position: "relative",
-          width: 120,
+          width: 154,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
         }}
       >
-        {bubbleText === null && (
-          <MascotControls onEndSession={handleEndSession} />
-        )}
         {bubbleText !== null && bubblePlacement === "above" && (
           <SpeechBubble text={bubbleText} placement="above" />
         )}
-        {mascotArt}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            flexDirection: buttonSide === "left" ? "row-reverse" : "row",
+          }}
+        >
+          <div
+            aria-label="Move mascot"
+            title="Move mascot"
+            style={
+              {
+                width: 120,
+                height: 120,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "grab",
+                WebkitAppRegion: "drag",
+              } as React.CSSProperties
+            }
+          >
+            {mascotArt}
+          </div>
+          <EndSessionButton onEndSession={handleEndSession} />
+        </div>
         {bubbleText !== null && bubblePlacement === "below" && (
           <SpeechBubble text={bubbleText} placement="below" />
         )}

@@ -124,6 +124,11 @@ export interface MascotGetBoundsResponse {
   height: number;
 }
 
+// Which side of the mascot should hold the session-ending control. The value
+// names the button's side, rather than the half of the display the mascot is
+// on, so the renderer can apply it directly to its layout.
+export type MascotButtonSide = "left" | "right";
+
 export interface MascotSetSpeechBubbleRequest {
   placement: "above" | "below" | null;
 }
@@ -200,6 +205,8 @@ export interface IpcApi {
     select(req: MascotSelectRequest): Promise<void>;
     delete(req: MascotDeleteRequest): Promise<void>;
     getBounds(): Promise<MascotGetBoundsResponse | null>;
+    getButtonSide(): Promise<MascotButtonSide>;
+    onButtonSideChange(cb: (side: MascotButtonSide) => void): () => void;
     setSpeechBubble(req: MascotSetSpeechBubbleRequest): Promise<void>;
   };
   permissions: {

@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 // itself was launched (differs between `npm run dev` and a direct binary launch).
 dotenv.config({ path: join(__dirname, "../../../.env") });
 
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, screen } from "electron";
 import { readFileSync } from "fs";
 import { extname } from "path";
 import type {
@@ -29,6 +29,7 @@ import type {
   MascotSelectRequest,
   MascotDeleteRequest,
   MascotGetBoundsResponse,
+  MascotButtonSide,
   MascotSetSpeechBubbleRequest,
   PermissionsGetStatusResponse,
   PermissionsRequestAccessibilityResponse,
@@ -288,6 +289,19 @@ ipcMain.handle("mascot:getBounds", (): MascotGetBoundsResponse | null => {
   return mascotWindow.getBounds();
 });
 
+function getMascotButtonSide(win: BrowserWindow): MascotButtonSide {
+  const bounds = win.getBounds();
+  const { workArea } = screen.getDisplayMatching(bounds);
+  const mascotCenterX = bounds.x + bounds.width / 2;
+  return mascotCenterX < workArea.x + workArea.width / 2 ? "right" : "left";
+}
+
+ipcMain.handle("mascot:getButtonSide", (): MascotButtonSide => {
+  // This handler is only useful to the mascot renderer, but return the
+  // default placement defensively while no mascot session is active.
+  return mascotWindow === null ? "right" : getMascotButtonSide(mascotWindow);
+});
+
 ipcMain.handle(
   "mascot:setSpeechBubble",
   (_e, req: MascotSetSpeechBubbleRequest): void => {
@@ -413,8 +427,8 @@ function createMascotWindow(sessionId: string): BrowserWindow {
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   }
 
-  // The mascot is dragged via native `-webkit-app-region: drag` (see
-  // Mascot.tsx's DragHandle) rather than a custom pointer-tracked/IPC-driven
+  // The mascot is dragged via native `-webkit-app-region: drag` on its art
+  // rather than a custom pointer-tracked/IPC-driven
   // setPosition loop, which was tried first and abandoned: it kept getting
   // silently intercepted by macOS's window-tiling gesture specifically in
   // the top portion of the screen, with no reliable code-level exemption
@@ -437,9 +451,10 @@ function createMascotWindow(sessionId: string): BrowserWindow {
         x: mascotSpeechState.compactBounds.x,
         y: mascotSpeechState.compactBounds.y,
       });
-      return;
+    } else {
+      saveMascotPosition({ x, y });
     }
-    saveMascotPosition({ x, y });
+    win.webContents.send("mascot:buttonSideChanged", getMascotButtonSide(win));
   });
 
   win.on("ready-to-show", () => win.showInactive());

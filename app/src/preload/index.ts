@@ -5,6 +5,7 @@ import type {
   NudgeTriggerPayload,
   NudgeClearPayload,
   SessionSummaryReadyPayload,
+  MascotButtonSide,
 } from "../shared/ipc";
 
 const api: IpcApi = {
@@ -62,6 +63,14 @@ const api: IpcApi = {
     select: (req) => ipcRenderer.invoke("mascot:select", req),
     delete: (req) => ipcRenderer.invoke("mascot:delete", req),
     getBounds: () => ipcRenderer.invoke("mascot:getBounds"),
+    getButtonSide: () => ipcRenderer.invoke("mascot:getButtonSide"),
+    onButtonSideChange: (cb) => {
+      const handler = (_e: Electron.IpcRendererEvent, side: MascotButtonSide) =>
+        cb(side);
+      ipcRenderer.on("mascot:buttonSideChanged", handler);
+      return () =>
+        ipcRenderer.removeListener("mascot:buttonSideChanged", handler);
+    },
     setSpeechBubble: (req) => ipcRenderer.invoke("mascot:setSpeechBubble", req),
   },
   permissions: {

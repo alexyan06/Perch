@@ -162,11 +162,11 @@ Deletes a saved mascot's directory. If it was the currently selected one, the se
 Request: `{ id: string }`
 Response: `{}`
 
-### Mascot dragging — not an IPC channel
+### Mascot dragging and control side
 
-The mascot window always starts bottom-right of the primary display — there's no corner picker. From there, it's repositioned by dragging the visible character itself, via native `-webkit-app-region: drag` on a small hover-revealed handle (`Mascot.tsx`'s `DragHandle`) — the OS handles the entire gesture, so there's no `mascot:drag*` IPC surface at all. (An earlier version drove the window from the renderer via `mascot:dragStart`/`dragTo`/`dragEnd`, computing position from `screen.getCursorScreenPoint()` in main; that was abandoned because it kept getting silently intercepted by macOS's window-tiling gesture specifically in the top portion of the screen, with no reliable code-level exemption found.) The window's `moved` event (fired once when a native drag finishes) is main's only signal for persisting the resulting position to `userData/mascot-position.json` as `{x, y}`, via `app/src/main/mascot-position.ts`.
+The mascot window always starts bottom-right of the primary display — there's no corner picker. The visible 120px mascot art is the native `-webkit-app-region: drag` target, so the OS handles repositioning without any `mascot:drag*` IPC surface. The window's `moved` event (fired when a native drag finishes) persists its position to `userData/mascot-position.json` as `{x, y}`, via `app/src/main/mascot-position.ts`.
 
-Because the drag region swallows all pointer events including click, it can't share pixels with the click-to-end-session target — the handle is a separate small element above the character, not the character itself.
+The adjacent X control remains a `no-drag` surface. `mascot:getButtonSide` returns `"left"` or `"right"` for initial renderer layout, and `mascot:buttonSideChanged` pushes the new side after a move. Main derives it from the mascot bounds and the work-area midpoint of the display containing the mascot: the X sits on the inward side (right when the mascot is in the display's left half, and left otherwise).
 
 ### `permissions:getStatus`
 
