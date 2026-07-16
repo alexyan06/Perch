@@ -10,9 +10,28 @@ export interface BrowserSignal {
 }
 
 let latestBrowserSignal: BrowserSignal | null = null;
+const browserSignalListeners = new Set<() => void>();
 
 export function getLatestBrowserSignal(): BrowserSignal | null {
   return latestBrowserSignal;
+}
+
+// Tab events are delivered immediately by the extension. Consumers decide how
+// to schedule their work, which keeps this transport module independent from
+// session lifecycle and classification state.
+export function onBrowserSignalChange(listener: () => void): () => void {
+  browserSignalListeners.add(listener);
+  return () => browserSignalListeners.delete(listener);
+}
+
+function notifyBrowserSignalChange(): void {
+  for (const listener of browserSignalListeners) {
+    try {
+      listener();
+    } catch (err) {
+      console.error("[ws] browser signal listener failed:", err);
+    }
+  }
 }
 
 export function startWsServer(): void {
@@ -52,7 +71,12 @@ export function startWsServer(): void {
             tabTitle: string;
             timestamp: string;
           };
+          const changed =
+            latestBrowserSignal === null ||
+            latestBrowserSignal.url !== url ||
+            latestBrowserSignal.tabTitle !== tabTitle;
           latestBrowserSignal = { url, tabTitle, timestamp };
+          if (changed) notifyBrowserSignalChange();
           console.log("[ws] tab:update →", msg);
         }
       }
@@ -67,7 +91,10 @@ export function startWsServer(): void {
       // desktopCapturer found nothing and it looked like a permissions
       // problem). Clearing it lets poller.ts's existing native-signal
       // fallback take over honestly until a fresh tab:update arrives.
-      latestBrowserSignal = null;
+      if (latestBrowserSignal !== null) {
+        latestBrowserSignal = null;
+        notifyBrowserSignalChange();
+      }
     });
 
     socket.on("error", (err) => {

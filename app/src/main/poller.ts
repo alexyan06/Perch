@@ -2,9 +2,13 @@ import activeWin from "active-win";
 import { BrowserWindow, powerMonitor } from "electron";
 import { insertClassificationEvent } from "./db";
 import { classifyTier1 } from "./classifier";
-import { getLatestBrowserSignal } from "./ws-server";
+import { getLatestBrowserSignal, onBrowserSignalChange } from "./ws-server";
 import { createEscalationTracker } from "./escalation";
 import { createNudgeTracker } from "./nudge";
+import {
+  createDebouncedTrigger,
+  createSerializedScheduler,
+} from "./poll-scheduler";
 import type {
   ClassificationTickPayload,
   NudgeClearPayload,
@@ -25,6 +29,8 @@ const BROWSER_APP_NAMES = [
 ];
 
 const POLL_INTERVAL_MS = 7000;
+const ACTIVE_WINDOW_CHECK_INTERVAL_MS = 500;
+const BROWSER_SIGNAL_DEBOUNCE_MS = 250;
 
 function sendNudgeClear(sessionId: string): void {
   const clearPayload: NudgeClearPayload = { sessionId };
@@ -42,9 +48,20 @@ export function startPolling(
   const { task, distractionList, approvedList } = config;
   const escalationTracker = createEscalationTracker();
   const nudgeTracker = createNudgeTracker(sessionId);
+  let disposed = false;
+  let lastObservedNativeSignal: string | null = null;
+  let activeWindowRead: ReturnType<typeof activeWin> | null = null;
+
+  const getActiveWindow = (): ReturnType<typeof activeWin> => {
+    if (activeWindowRead !== null) return activeWindowRead;
+    activeWindowRead = activeWin().finally(() => {
+      activeWindowRead = null;
+    });
+    return activeWindowRead;
+  };
 
   const tick = async (): Promise<void> => {
-    const win = await activeWin();
+    const win = await getActiveWindow();
     const idleSeconds = powerMonitor.getSystemIdleTime();
     const timestamp = new Date().toISOString();
 
@@ -140,11 +157,49 @@ export function startPolling(
     });
   };
 
-  void tick();
-  const interval = setInterval(() => void tick(), POLL_INTERVAL_MS);
+  const scheduler = createSerializedScheduler(tick, (err) => {
+    console.error("[poller] classification tick failed:", err);
+  });
+  const browserSignalTrigger = createDebouncedTrigger(
+    scheduler.request,
+    BROWSER_SIGNAL_DEBOUNCE_MS,
+  );
+
+  const observeNativeSignal = async (): Promise<void> => {
+    try {
+      const win = await getActiveWindow();
+      if (disposed) return;
+      const signal =
+        `${win?.id ?? ""}|${win?.owner.processId ?? ""}|${win?.title ?? ""}`.toLowerCase();
+      if (lastObservedNativeSignal === null) {
+        lastObservedNativeSignal = signal;
+      } else if (signal !== lastObservedNativeSignal) {
+        lastObservedNativeSignal = signal;
+        scheduler.request();
+      }
+    } catch (err) {
+      console.error("[poller] native signal observation failed:", err);
+    }
+  };
+
+  const unsubscribeBrowserSignal = onBrowserSignalChange(
+    browserSignalTrigger.request,
+  );
+  scheduler.request();
+  void observeNativeSignal();
+  const interval = setInterval(scheduler.request, POLL_INTERVAL_MS);
+  const nativeSignalInterval = setInterval(
+    () => void observeNativeSignal(),
+    ACTIVE_WINDOW_CHECK_INTERVAL_MS,
+  );
 
   return () => {
+    disposed = true;
     clearInterval(interval);
+    clearInterval(nativeSignalInterval);
+    browserSignalTrigger.dispose();
+    unsubscribeBrowserSignal();
+    scheduler.dispose();
     // A distraction interval only closes on an on_task tick — if the session
     // ends while still off-task, force that close now so the row doesn't
     // dangle with ended_at = NULL forever (undercounting distracted time).
