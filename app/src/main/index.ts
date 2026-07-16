@@ -79,6 +79,18 @@ import {
 let stopPolling: (() => void) | null = null;
 let mainWindow: BrowserWindow | null = null;
 let mascotWindow: BrowserWindow | null = null;
+type PanelWindowBridge = {
+  makeKeyWindow(window: BrowserWindow): void;
+  makePanel(window: BrowserWindow): void;
+  makeWindow(window: BrowserWindow): void;
+};
+
+// The native addon only supports macOS, so avoid loading it at all on other
+// platforms. Those platforms retain the ordinary BrowserWindow behavior.
+const panelWindowBridge: PanelWindowBridge | null =
+  process.platform === "darwin"
+    ? (require("@ashubashir/electron-panel-window") as PanelWindowBridge)
+    : null;
 let mascotSpeechState:
   | {
       compactBounds: { x: number; y: number; width: number; height: number };
@@ -89,15 +101,15 @@ let suppressMascotMoveSave = false;
 
 ipcMain.handle(
   "session:start",
-  (_e, req: SessionStartRequest): SessionStartResponse => {
+  async (_e, req: SessionStartRequest): Promise<SessionStartResponse> => {
     const { id, startedAt } = createSession(
       req.task,
       req.distractionList,
       req.approvedList,
     );
     stopPolling?.();
+    await disposeMascotWindow();
     stopPolling = startPolling(id, req);
-    mascotWindow?.close();
     mascotWindow = createMascotWindow(id);
     mainWindow?.hide();
     return { sessionId: id, startedAt };
@@ -109,9 +121,9 @@ ipcMain.handle(
   async (_e, req: SessionEndRequest): Promise<SessionEndResponse> => {
     stopPolling?.();
     stopPolling = null;
-    mascotWindow?.close();
-    mascotWindow = null;
+    await disposeMascotWindow();
     mainWindow?.show();
+    mainWindow?.focus();
 
     const endedAt = new Date().toISOString();
 
@@ -394,7 +406,12 @@ function createMascotWindow(sessionId: string): BrowserWindow {
     },
   });
 
-  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  if (process.platform === "darwin") {
+    panelWindowBridge?.makePanel(win);
+    win.setAlwaysOnTop(true, "screen-saver");
+  } else {
+    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  }
 
   // The mascot is dragged via native `-webkit-app-region: drag` (see
   // Mascot.tsx's DragHandle) rather than a custom pointer-tracked/IPC-driven
@@ -437,6 +454,32 @@ function createMascotWindow(sessionId: string): BrowserWindow {
   return win;
 }
 
+async function disposeMascotWindow(): Promise<void> {
+  const win = mascotWindow;
+  mascotSpeechState = null;
+
+  if (win === null) return;
+  if (win.isDestroyed()) {
+    if (mascotWindow === win) mascotWindow = null;
+    return;
+  }
+
+  if (process.platform === "darwin" && panelWindowBridge !== null) {
+    // NSPanel instances must be converted back before closing. Letting the
+    // hide settle before changing the key window avoids native teardown
+    // crashes documented by the bridge.
+    win.hide();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    if (mainWindow !== null && !mainWindow.isDestroyed()) {
+      panelWindowBridge.makeKeyWindow(mainWindow);
+    }
+    panelWindowBridge.makeWindow(win);
+  }
+
+  win.close();
+  if (mascotWindow === win) mascotWindow = null;
+}
+
 app.whenReady().then(() => {
   migrateLegacyMascotIfNeeded();
   startWsServer();
@@ -444,6 +487,17 @@ app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+let isQuitting = false;
+app.on("before-quit", (event) => {
+  if (process.platform !== "darwin" || isQuitting || mascotWindow === null) {
+    return;
+  }
+
+  event.preventDefault();
+  isQuitting = true;
+  void disposeMascotWindow().finally(() => app.quit());
 });
 
 app.on("window-all-closed", () => {
