@@ -56,12 +56,15 @@ import {
 import {
   saveNewMascot,
   getActiveMascotImages,
+  getActiveMascotVoiceProfile,
   listMascots,
   getSelectedMascotId,
   selectMascot,
   deleteMascot,
   migrateLegacyMascotIfNeeded,
 } from "./mascot-library";
+import { generateMascotVoiceProfile, generateSessionMessagePack } from "./mascot-copy-client";
+import { GENERIC_MASCOT_MESSAGE_PACK, type MascotMessagePack } from "../shared/mascot-messages";
 import {
   getPermissionStatus,
   openScreenRecordingSettings,
@@ -110,7 +113,16 @@ ipcMain.handle(
     );
     stopPolling?.();
     await disposeMascotWindow();
-    stopPolling = startPolling(id, req);
+    let messagePack: MascotMessagePack = GENERIC_MASCOT_MESSAGE_PACK;
+    const voiceProfile = getActiveMascotVoiceProfile();
+    if (voiceProfile !== null) {
+      try {
+        messagePack = await generateSessionMessagePack(voiceProfile, req.task);
+      } catch (err) {
+        console.error("[mascot-copy] session message pack failed; using fallback:", err);
+      }
+    }
+    stopPolling = startPolling(id, req, messagePack);
     mascotWindow = createMascotWindow(id);
     mainWindow?.hide();
     return { sessionId: id, startedAt };
@@ -256,12 +268,18 @@ ipcMain.handle(
   }),
 );
 
-ipcMain.handle("mascot:save", (): MascotSaveResponse => {
+ipcMain.handle("mascot:save", async (): Promise<MascotSaveResponse> => {
   const stages = getStagesForSaving();
   if (stages === null) {
     throw new Error("[mascot:save] not all 4 stages are ready yet");
   }
-  return saveNewMascot(stages);
+  let voiceProfile = null;
+  try {
+    voiceProfile = await generateMascotVoiceProfile(stages.calm);
+  } catch (err) {
+    console.error("[mascot-copy] voice profile failed; saving without one:", err);
+  }
+  return saveNewMascot(stages, voiceProfile);
 });
 
 ipcMain.handle("mascot:getActive", (): MascotGetActiveResponse | null =>

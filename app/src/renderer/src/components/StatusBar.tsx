@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { formatDuration } from "../mascot-messages";
+import { formatDuration } from "../../../shared/mascot-messages";
 
 interface Props {
   onTaskSeconds: number;

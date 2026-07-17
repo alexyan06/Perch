@@ -12,6 +12,12 @@ import { join } from "path";
 import { newId } from "./db";
 import { STAGE_ORDER, type StageName } from "./mascot-setup";
 
+export interface MascotVoiceProfile {
+  visualDescription: string;
+  voiceTraits: string[];
+  generatedAt: string;
+}
+
 function mascotsRoot(): string {
   return join(app.getPath("userData"), "mascots");
 }
@@ -75,6 +81,33 @@ export function getActiveMascotImages(): Record<StageName, string> | null {
   return readMascotImages(mascotDir(selectedId));
 }
 
+export function getActiveMascotVoiceProfile(): MascotVoiceProfile | null {
+  const selectedId = getSelectedMascotId();
+  if (selectedId === null) return null;
+  try {
+    const data: unknown = JSON.parse(
+      readFileSync(join(mascotDir(selectedId), "metadata.json"), "utf8"),
+    );
+    if (typeof data !== "object" || data === null) return null;
+    const profile = (data as { voiceProfile?: unknown }).voiceProfile;
+    if (
+      typeof profile !== "object" ||
+      profile === null ||
+      typeof (profile as { visualDescription?: unknown }).visualDescription !== "string" ||
+      !Array.isArray((profile as { voiceTraits?: unknown }).voiceTraits) ||
+      !(profile as { voiceTraits: unknown[] }).voiceTraits.every(
+        (trait) => typeof trait === "string",
+      ) ||
+      typeof (profile as { generatedAt?: unknown }).generatedAt !== "string"
+    ) {
+      return null;
+    }
+    return profile as MascotVoiceProfile;
+  } catch {
+    return null;
+  }
+}
+
 export interface MascotListEntry {
   id: string;
   createdAt: string;
@@ -121,7 +154,10 @@ export function listMascots(): MascotListEntry[] {
   return entries.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export function saveNewMascot(stages: Record<StageName, string>): {
+export function saveNewMascot(
+  stages: Record<StageName, string>,
+  voiceProfile: MascotVoiceProfile | null,
+): {
   id: string;
   savedAt: string;
 } {
@@ -137,7 +173,10 @@ export function saveNewMascot(stages: Record<StageName, string>): {
   const savedAt = new Date().toISOString();
   writeFileSync(
     join(dir, "metadata.json"),
-    JSON.stringify({ createdAt: savedAt }),
+    JSON.stringify({
+      createdAt: savedAt,
+      ...(voiceProfile === null ? {} : { voiceProfile }),
+    }),
   );
 
   // Generating and saving a new one becomes the active mascot immediately,

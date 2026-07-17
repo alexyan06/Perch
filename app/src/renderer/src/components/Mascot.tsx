@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { pickMascotMessage, pickResetMessage } from "../mascot-messages";
 import type { MascotButtonSide } from "../../../shared/ipc";
 
 type Stage = 0 | 1 | 2 | 3;
@@ -246,10 +245,6 @@ export function Mascot(): React.JSX.Element {
   const [bubblePlacement, setBubblePlacement] =
     useState<BubblePlacement>("above");
   const [buttonSide, setButtonSide] = useState<MascotButtonSide>("right");
-  // Remembered across the nudge:clear payload, which only carries a
-  // sessionId (see docs/ipc-contract.md) — the reset message still wants to
-  // reference whatever task was last in play.
-  const lastTaskRef = useRef<string>("");
   const bubbleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Independent of the nudge subscription below — "what to show" and "which
@@ -306,20 +301,13 @@ export function Mascot(): React.JSX.Element {
     const unsubTrigger = window.api.nudge.onTrigger((payload) => {
       if (payload.sessionId === sessionId) {
         setStage(payload.stage);
-        lastTaskRef.current = payload.task;
-        showBubble(
-          pickMascotMessage(
-            payload.stage,
-            payload.task,
-            payload.distractedSinceSeconds,
-          ),
-        );
+        showBubble(payload.message);
       }
     });
     const unsubClear = window.api.nudge.onClear((payload) => {
       if (payload.sessionId === sessionId) {
         setStage(0);
-        showBubble(pickResetMessage(lastTaskRef.current));
+        showBubble(payload.message);
       }
     });
     return () => {

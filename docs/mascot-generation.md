@@ -191,7 +191,7 @@ collection is small, file-based, and doesn't need relational queries — just
 userData/mascots/
   <mascotId>/
     calm.png, gentle.png, upset.png, breakdown.png
-    metadata.json   → { createdAt: string }
+    metadata.json   → { createdAt: string, voiceProfile?: { visualDescription, voiceTraits, generatedAt } }
   <mascotId2>/ ...
   selected.json     → { selectedMascotId: string | null }
 ```

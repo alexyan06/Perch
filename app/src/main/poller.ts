@@ -9,6 +9,11 @@ import {
   createDebouncedTrigger,
   createSerializedScheduler,
 } from "./poll-scheduler";
+import {
+  pickMascotMessage,
+  pickResetMessage,
+  type MascotMessagePack,
+} from "../shared/mascot-messages";
 import type {
   ClassificationTickPayload,
   NudgeClearPayload,
@@ -32,8 +37,8 @@ const POLL_INTERVAL_MS = 7000;
 const ACTIVE_WINDOW_CHECK_INTERVAL_MS = 500;
 const BROWSER_SIGNAL_DEBOUNCE_MS = 250;
 
-function sendNudgeClear(sessionId: string): void {
-  const clearPayload: NudgeClearPayload = { sessionId };
+function sendNudgeClear(sessionId: string, message: string): void {
+  const clearPayload: NudgeClearPayload = { sessionId, message };
   BrowserWindow.getAllWindows()[0]?.webContents.send(
     "nudge:clear",
     clearPayload,
@@ -44,6 +49,7 @@ function sendNudgeClear(sessionId: string): void {
 export function startPolling(
   sessionId: string,
   config: SessionStartRequest,
+  messagePack: MascotMessagePack,
 ): () => void {
   const { task, distractionList, approvedList } = config;
   const escalationTracker = createEscalationTracker();
@@ -132,6 +138,12 @@ export function startPolling(
         stage: nudgeEvent.stage,
         task,
         distractedSinceSeconds: nudgeEvent.distractedSinceSeconds,
+        message: pickMascotMessage(
+          messagePack,
+          nudgeEvent.stage,
+          task,
+          nudgeEvent.distractedSinceSeconds,
+        ),
       };
       BrowserWindow.getAllWindows()[0]?.webContents.send(
         "nudge:trigger",
@@ -139,7 +151,7 @@ export function startPolling(
       );
       console.log("[nudge] trigger", nudgePayload);
     } else if (nudgeEvent.type === "clear") {
-      sendNudgeClear(sessionId);
+      sendNudgeClear(sessionId, pickResetMessage(messagePack, task));
     }
 
     console.log("[poller]", {
@@ -205,7 +217,7 @@ export function startPolling(
     // dangle with ended_at = NULL forever (undercounting distracted time).
     const finalEvent = nudgeTracker.onTick("on_task", Date.now());
     if (finalEvent.type === "clear") {
-      sendNudgeClear(sessionId);
+      sendNudgeClear(sessionId, pickResetMessage(messagePack, task));
     }
   };
 }

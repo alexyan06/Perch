@@ -168,6 +168,8 @@ The mascot window always starts bottom-right of the primary display — there's 
 
 The adjacent X control remains a `no-drag` surface. `mascot:getButtonSide` returns `"left"` or `"right"` for initial renderer layout, and `mascot:buttonSideChanged` pushes the new side after a move. Main derives it from the mascot bounds and the work-area midpoint of the display containing the mascot: the X sits on the inward side (right when the mascot is in the display's left half, and left otherwise).
 
+`nudge:trigger` and `nudge:clear` include a final `message` string chosen in main. Custom mascots may have a saved voice profile and receive a fresh task-specific message pack at session start; all generation failures fall back to the bundled neutral templates.
+
 ### `permissions:getStatus`
 
 Checked fresh every call, never cached — macOS only, always reports both `true` on other platforms (see PRD §8, `docs/mascot-generation.md`-style verified-not-assumed note: `systemPreferences.getMediaAccessStatus`/`isTrustedAccessibilityClient` are both `@platform darwin`).

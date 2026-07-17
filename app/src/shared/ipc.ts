@@ -157,10 +157,12 @@ export interface NudgeTriggerPayload {
   stage: 1 | 2 | 3;
   task: string;
   distractedSinceSeconds: number;
+  message: string;
 }
 
 export interface NudgeClearPayload {
   sessionId: string;
+  message: string;
 }
 
 export interface SessionSummaryReadyPayload {

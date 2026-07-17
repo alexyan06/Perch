@@ -1,5 +1,5 @@
 import type { CategoryDuration } from "../../../shared/ipc";
-import { formatDuration } from "../mascot-messages";
+import { formatDuration } from "../../../shared/mascot-messages";
 
 interface Props {
   categories: CategoryDuration[];
