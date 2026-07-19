@@ -56,15 +56,14 @@ import {
 import {
   saveNewMascot,
   getActiveMascotImages,
-  getActiveMascotVoiceProfile,
   listMascots,
   getSelectedMascotId,
   selectMascot,
   deleteMascot,
   migrateLegacyMascotIfNeeded,
 } from "./mascot-library";
-import { generateMascotVoiceProfile, generateSessionMessagePack } from "./mascot-copy-client";
-import { GENERIC_MASCOT_MESSAGE_PACK, type MascotMessagePack } from "../shared/mascot-messages";
+import { generateSessionMessagePack } from "./mascot-copy-client";
+import { createMascotFallbackMessagePack, type MascotMessagePack } from "../shared/mascot-messages";
 import {
   getPermissionStatus,
   openScreenRecordingSettings,
@@ -113,14 +112,11 @@ ipcMain.handle(
     );
     stopPolling?.();
     await disposeMascotWindow();
-    let messagePack: MascotMessagePack = GENERIC_MASCOT_MESSAGE_PACK;
-    const voiceProfile = getActiveMascotVoiceProfile();
-    if (voiceProfile !== null) {
-      try {
-        messagePack = await generateSessionMessagePack(voiceProfile, req.task);
-      } catch (err) {
-        console.error("[mascot-copy] session message pack failed; using fallback:", err);
-      }
+    let messagePack: MascotMessagePack = createMascotFallbackMessagePack();
+    try {
+      messagePack = await generateSessionMessagePack(req.task);
+    } catch (err) {
+      console.error("[mascot-copy] session message pack failed; using fallback:", err);
     }
     stopPolling = startPolling(id, req, messagePack);
     mascotWindow = createMascotWindow(id);
@@ -273,13 +269,7 @@ ipcMain.handle("mascot:save", async (): Promise<MascotSaveResponse> => {
   if (stages === null) {
     throw new Error("[mascot:save] not all 4 stages are ready yet");
   }
-  let voiceProfile = null;
-  try {
-    voiceProfile = await generateMascotVoiceProfile(stages.calm);
-  } catch (err) {
-    console.error("[mascot-copy] voice profile failed; saving without one:", err);
-  }
-  return saveNewMascot(stages, voiceProfile);
+  return saveNewMascot(stages);
 });
 
 ipcMain.handle("mascot:getActive", (): MascotGetActiveResponse | null =>

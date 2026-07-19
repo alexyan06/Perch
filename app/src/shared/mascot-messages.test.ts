@@ -1,27 +1,55 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  GENERIC_MASCOT_MESSAGE_PACK,
-  pickMascotMessage,
-  pickResetMessage,
+  createMascotMessagePicker,
+  createMascotFallbackMessagePack,
+  FALLBACK_MASCOT_MESSAGE_PACK,
 } from "./mascot-messages";
 
 describe("mascot messages", () => {
   it("renders the literal task and elapsed duration", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+    const picker = createMascotMessagePicker(
+      FALLBACK_MASCOT_MESSAGE_PACK,
+      () => 0,
+    );
     expect(
-      pickMascotMessage(GENERIC_MASCOT_MESSAGE_PACK, 3, "write tests", 65),
+      picker.pickNudge(3, "write tests", 65),
     ).toContain("1 minute");
     expect(
-      pickMascotMessage(GENERIC_MASCOT_MESSAGE_PACK, 3, "write tests", 65),
+      picker.pickNudge(3, "write tests", 65),
     ).toContain("write tests");
-    vi.restoreAllMocks();
   });
 
-  it("renders a task-specific reset", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
-    expect(pickResetMessage(GENERIC_MASCOT_MESSAGE_PACK, "write tests")).toBe(
-      "Back on: write tests.",
+  it("uses a direct no-duration line for a rapid relapse", () => {
+    const picker = createMascotMessagePicker(
+      FALLBACK_MASCOT_MESSAGE_PACK,
+      () => 0,
     );
-    vi.restoreAllMocks();
+    const message = picker.pickNudge(3, "play chess", 0, "rapid_relapse");
+    expect(message).toContain("play chess");
+    expect(message).not.toContain("0 seconds");
+  });
+
+  it("rotates through every message before repeating", () => {
+    const pack = createMascotFallbackMessagePack();
+    const picker = createMascotMessagePicker(pack, () => 0);
+    const messages = new Set(
+      Array.from({ length: pack.gentle.length }, () =>
+        picker.pickNudge(1, "write tests", 0),
+      ),
+    );
+    expect(messages).toHaveLength(pack.gentle.length);
+    expect(picker.pickNudge(1, "write tests", 0)).toBeDefined();
+  });
+
+  it("keeps reset rotation independent from distraction stages", () => {
+    const pack = createMascotFallbackMessagePack();
+    const picker = createMascotMessagePicker(pack, () => 0);
+    picker.pickNudge(1, "write tests", 0);
+    const resets = new Set(
+      Array.from({ length: pack.reset.length }, () =>
+        picker.pickReset("write tests"),
+      ),
+    );
+    expect(resets).toHaveLength(pack.reset.length);
   });
 });

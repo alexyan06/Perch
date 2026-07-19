@@ -10,8 +10,7 @@ import {
   createSerializedScheduler,
 } from "./poll-scheduler";
 import {
-  pickMascotMessage,
-  pickResetMessage,
+  createMascotMessagePicker,
   type MascotMessagePack,
 } from "../shared/mascot-messages";
 import type {
@@ -54,6 +53,7 @@ export function startPolling(
   const { task, distractionList, approvedList } = config;
   const escalationTracker = createEscalationTracker();
   const nudgeTracker = createNudgeTracker(sessionId);
+  const messagePicker = createMascotMessagePicker(messagePack);
   let disposed = false;
   let lastObservedNativeSignal: string | null = null;
   let activeWindowRead: ReturnType<typeof activeWin> | null = null;
@@ -138,11 +138,11 @@ export function startPolling(
         stage: nudgeEvent.stage,
         task,
         distractedSinceSeconds: nudgeEvent.distractedSinceSeconds,
-        message: pickMascotMessage(
-          messagePack,
+        message: messagePicker.pickNudge(
           nudgeEvent.stage,
           task,
           nudgeEvent.distractedSinceSeconds,
+          nudgeEvent.escalationReason,
         ),
       };
       BrowserWindow.getAllWindows()[0]?.webContents.send(
@@ -151,7 +151,7 @@ export function startPolling(
       );
       console.log("[nudge] trigger", nudgePayload);
     } else if (nudgeEvent.type === "clear") {
-      sendNudgeClear(sessionId, pickResetMessage(messagePack, task));
+      sendNudgeClear(sessionId, messagePicker.pickReset(task));
     }
 
     console.log("[poller]", {
@@ -217,7 +217,7 @@ export function startPolling(
     // dangle with ended_at = NULL forever (undercounting distracted time).
     const finalEvent = nudgeTracker.onTick("on_task", Date.now());
     if (finalEvent.type === "clear") {
-      sendNudgeClear(sessionId, pickResetMessage(messagePack, task));
+      sendNudgeClear(sessionId, messagePicker.pickReset(task));
     }
   };
 }

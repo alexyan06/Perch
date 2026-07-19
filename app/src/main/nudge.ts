@@ -9,7 +9,12 @@ const RELAPSE_WINDOW_MS = 45_000;
 const REPEATED_RELAPSE_COUNT = 2;
 
 export type NudgeEvent =
-  | { type: "trigger"; stage: 1 | 2 | 3; distractedSinceSeconds: number }
+  | {
+      type: "trigger";
+      stage: 1 | 2 | 3;
+      distractedSinceSeconds: number;
+      escalationReason: "elapsed" | "rapid_relapse";
+    }
   | { type: "clear" }
   | { type: "none" };
 
@@ -74,7 +79,8 @@ export function createNudgeTracker(
     }
 
     const elapsedMs = now - distractionStartedAt;
-    let targetStage = durationStage(elapsedMs);
+    const elapsedStage = durationStage(elapsedMs);
+    let targetStage = elapsedStage;
     if (relapseCount >= REPEATED_RELAPSE_COUNT) {
       targetStage = Math.max(targetStage, 3) as NudgeStage;
     } else if (relapseCount >= 1) {
@@ -89,6 +95,8 @@ export function createNudgeTracker(
         type: "trigger",
         stage: currentStage as 1 | 2 | 3,
         distractedSinceSeconds: Math.floor(elapsedMs / 1000),
+        escalationReason:
+          targetStage > elapsedStage ? "rapid_relapse" : "elapsed",
       };
     }
 

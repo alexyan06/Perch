@@ -14,9 +14,10 @@ converted into a small pixel-art sprite set — one image per nudge stage
 (calm / gentle / upset / breakdown) — that then drives the existing always-on-top
 mascot window exactly as hand-authored art would have.
 
-This is additive to the core loop, not part of it. Nothing about session
-monitoring, classification, or the nudge state machine changes — only the
-asset source for the mascot window's stage images.
+This is additive to the core loop. Session monitoring, classification, and
+the nudge state machine do not change; task-specific nudge copy is generated
+separately at the start of each session and does not depend on the mascot's
+appearance.
 
 ## 2. Why Pixel Art
 
@@ -191,7 +192,7 @@ collection is small, file-based, and doesn't need relational queries — just
 userData/mascots/
   <mascotId>/
     calm.png, gentle.png, upset.png, breakdown.png
-    metadata.json   → { createdAt: string, voiceProfile?: { visualDescription, voiceTraits, generatedAt } }
+    metadata.json   → { createdAt: string }
   <mascotId2>/ ...
   selected.json     → { selectedMascotId: string | null }
 ```
