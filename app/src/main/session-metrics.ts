@@ -90,7 +90,10 @@ export function extractCategoryLabel(rawSignal: unknown): string {
   }
 
   if (typeof signal.appName === "string" && signal.appName.length > 0) {
-    return signal.appName;
+    // Electron reports the host process name rather than Perch's app name.
+    // Keep the underlying signal intact, but present Perch in the user's
+    // session history where this is their own desktop companion.
+    return signal.appName.toLowerCase() === "electron" ? "Perch" : signal.appName;
   }
 
   return "Unknown";
