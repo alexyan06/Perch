@@ -1,14 +1,14 @@
 # Perch
 
-A desktop app that watches your active work session, classifies what you're
-actually doing against a task you declared at the start (on-task /
-distraction / drift), and nudges you back on track through an always-on-top
-mascot companion — draggable out of the way, snappable to a corner, or
-generated from your own photo — whose expression _is_ the notification (see
-[below](#the-mascot-companion)). At the end of a session you get a
-locally-computed breakdown of on-task vs. distracted time and where the time
-went, no AI call required for that part, plus a rolling trends view across
-your last 7 days of sessions.
+A desktop focus companion. Start a session with the thing you mean to work
+on, and Perch compares your active activity with that task (on-task /
+distraction / drift). An always-on-top mascot responds in real time with a
+clear, state-first nudge: stay on task, or get back to it. The mascot can be
+moved out of the way, snapped to a corner, or generated from your own photo.
+
+When a session ends, Perch shows a locally computed breakdown of on-task vs.
+distracted time and where the time went—no AI call is needed for the summary—
+plus a rolling seven-day trends view.
 
 Full product spec: [`docs/PRD.md`](docs/PRD.md).
 
@@ -25,6 +25,12 @@ Full product spec: [`docs/PRD.md`](docs/PRD.md).
 - **Chrome extension** (Manifest V3) reports the active tab's URL/title to
   the Electron app over a local WebSocket, since a browser tab's real content
   is invisible to OS-level window polling alone.
+- **Nudge wording is state-first and varied.** At the start of a session,
+  Perch makes one small text request for several task-aware ending fragments
+  for each nudge state. The app always supplies the core message itself—for
+  example, that you're off task and should get back to the declared task—then
+  rotates the fragments without repeats. If that request fails or no API key
+  is configured, a built-in message pack keeps nudges working.
 - **Past sessions** are saved locally, individually deletable, and a rolling
   last-7-days trends view — reusing the same charts as a single session's
   summary — sits above the list.
@@ -34,12 +40,12 @@ Full product spec: [`docs/PRD.md`](docs/PRD.md).
 The mascot _is_ the notification system — there's no OS-level notification
 anywhere in this app. A small, frameless, always-on-top window sits in a
 corner of your screen for the whole session and reacts live to your focus
-state: calm and idle while you're on-task, noticing and perking up as
-distraction starts, escalating through visibly upset to a "breaking down"
-state the longer it sustains — speaking through its own in-window speech
-bubble at every stage, picked from a pool of pre-written lines so it doesn't
-repeat itself. The instant you're back on task, it resets, no lingering
-grudge.
+state: calm and idle while you're on-task, noticing as distraction starts,
+escalating through visibly upset to a "breaking down" state the longer it
+sustains, then resetting the instant you're back on task. Its in-window
+speech bubble stays focused on that job: acknowledge that you're on track or
+directly tell you to return to the task. Task-specific references are only a
+small bit of flavor, never a replacement for the focus cue.
 
 - **Repositionable.** Drag the mascot itself to move it anywhere on screen,
   including onto a second monitor. The End session control stays beside it,
@@ -115,10 +121,10 @@ report those permissions as granted and haven't been verified end-to-end.
    cp .env.example .env
    ```
 
-   | Variable            | Required?            | Purpose                                                                                                                                                                                                                                                                      |
-   | ------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-   | `OPENAI_API_KEY`    | Effectively required | Powers vision escalation (tier 3 classification) and the opt-in custom mascot photo-generation feature. Without it, the app still runs — ambiguous cases never resolve past "ambiguous" and the bundled default mascot is used. Get one at [platform.openai.com](https://platform.openai.com/api-keys). |
-   | `WS_PORT`           | Not currently used   | Reserved for the local WebSocket port the app and extension talk over. The port is currently hardcoded to `8743` in both the app and extension — setting this has no effect yet.                                                                                             |
+   | Variable            | Required? | Purpose |
+   | ------------------- | --------- | ------- |
+   | `OPENAI_API_KEY`    | Optional  | Enables vision escalation for ambiguous activity, one task-aware nudge-fragment pack per session, and opt-in custom mascot photo generation. Without it, the app still runs with the bundled mascot and static nudge fragments, but ambiguous activity remains ambiguous and photo generation is unavailable. Get one at [platform.openai.com](https://platform.openai.com/api-keys). |
+   | `WS_PORT`           | Not currently used | Reserved for the local WebSocket port. The app and extension currently use hardcoded port `8743`, so setting this has no effect yet. |
 
    `.env` is gitignored — never commit it.
 
@@ -162,8 +168,19 @@ Run from the repo root unless noted:
 
 ## Data & privacy
 
-Everything is stored locally in SQLite under your OS's app data directory —
-nothing about your sessions is sent anywhere except the specific text/image
-payloads described above, sent directly to OpenAI's API using
-your own key. There's no telemetry, no backend server, and no team/shared
-features (see `docs/PRD.md` for the full non-goals list).
+Everything is stored locally in SQLite under your OS's app data directory.
+There is no telemetry, backend server, or team/shared feature.
+
+When `OPENAI_API_KEY` is configured, Perch sends the following directly to
+OpenAI using your key:
+
+- The declared task once at session start, to generate optional, short
+  task-aware endings for the nudge message pools.
+- A screenshot of the active window, the declared task, and the user's
+  distraction list only after activity remains ambiguous long enough to
+  reach vision escalation. Screenshots are never saved to disk.
+- The photo supplied by the user only when they explicitly generate a custom
+  mascot from it.
+
+Browser URL/title signals, session history, saved mascot sprites, and
+session summaries stay local. See `docs/PRD.md` for the full non-goals list.
