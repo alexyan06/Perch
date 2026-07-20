@@ -1,186 +1,20 @@
 import { useEffect, useState } from "react";
-import type {
-  PastSession,
-  SessionGetTrendsResponse,
-} from "../../../shared/ipc";
+import { toast } from "sonner";
+import type { PastSession, SessionGetTrendsResponse } from "../../../shared/ipc";
 import { StatusBar } from "./StatusBar";
 import { CategoryBreakdown } from "./CategoryBreakdown";
-
-interface Props {
-  onBack: () => void;
-}
+import { ConfirmDialog } from "./ConfirmDialog";
+import { Button, LoadingCard, PageHeader, SectionCard } from "./ui";
 
 const TRENDS_DAYS = 7;
+function dayLabel(iso: string): string { return new Date(iso).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }); }
+function timeLabel(iso: string): string { return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }); }
+function groupSessions(sessions: PastSession[]): Array<[string, PastSession[]]> { const groups = new Map<string, PastSession[]>(); sessions.forEach((session) => { const key = dayLabel(session.startedAt); groups.set(key, [...(groups.get(key) ?? []), session]); }); return [...groups.entries()]; }
 
-function formatSessionDate(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-export function PastSessions({ onBack }: Props): React.JSX.Element {
-  const [sessions, setSessions] = useState<PastSession[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [trends, setTrends] = useState<SessionGetTrendsResponse | null>(null);
-  const [trendsError, setTrendsError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    window.api.session
-      .getPast({ limit: 20 })
-      .then((res) => {
-        if (!cancelled) setSessions(res.sessions);
-      })
-      .catch((err: unknown) => {
-        console.error("[PastSessions] session:getPast failed:", err);
-        if (!cancelled) setError("Couldn't load past sessions right now.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Fetched independently from the session list — a trends failure
-  // shouldn't block the list from showing, and vice versa.
-  useEffect(() => {
-    let cancelled = false;
-    window.api.session
-      .getTrends({ days: TRENDS_DAYS })
-      .then((res) => {
-        if (!cancelled) setTrends(res);
-      })
-      .catch((err: unknown) => {
-        console.error("[PastSessions] session:getTrends failed:", err);
-        if (!cancelled) setTrendsError("Couldn't load trends right now.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleDelete = async (sessionId: string): Promise<void> => {
-    if (!window.confirm("Delete this session? This can't be undone.")) {
-      return;
-    }
-    setBusyId(sessionId);
-    setError(null);
-    try {
-      await window.api.session.delete({ sessionId });
-      setSessions((prev) => prev?.filter((s) => s.id !== sessionId) ?? null);
-    } catch (err) {
-      console.error("[PastSessions] session:delete failed:", err);
-      setError("Couldn't delete that session right now.");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  return (
-    <div className="flex min-h-screen justify-center bg-background py-12">
-      <div className="w-full max-w-lg space-y-6 px-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Past sessions</h1>
-          <button
-            className="text-sm text-muted-foreground hover:text-foreground"
-            onClick={onBack}
-          >
-            Back
-          </button>
-        </div>
-
-        {trendsError !== null && (
-          <p className="text-sm text-destructive">{trendsError}</p>
-        )}
-        {trends !== null && trends.sessionCount > 0 && (
-          <div className="space-y-3 rounded-lg bg-card p-6 text-card-foreground shadow-sm">
-            <h2 className="text-sm font-medium">
-              Last {TRENDS_DAYS} days · {trends.sessionCount} session
-              {trends.sessionCount === 1 ? "" : "s"}
-            </h2>
-            <StatusBar
-              onTaskSeconds={trends.onTaskSeconds}
-              distractedSeconds={trends.distractedSeconds}
-              ambiguousSeconds={trends.ambiguousSeconds}
-            />
-            <CategoryBreakdown categories={trends.categoryBreakdown} />
-          </div>
-        )}
-
-        {error !== null && <p className="text-sm text-destructive">{error}</p>}
-
-        {error === null && sessions === null && (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        )}
-
-        {sessions !== null && sessions.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            No sessions yet — start one to see it here.
-          </p>
-        )}
-
-        <div className="space-y-4">
-          {sessions?.map((s) => (
-            <div
-              key={s.id}
-              className="space-y-3 rounded-lg bg-card p-6 text-card-foreground shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <h2 className="text-sm font-medium">{s.task}</h2>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="whitespace-nowrap text-xs text-muted-foreground">
-                    {formatSessionDate(s.startedAt)}
-                  </span>
-                  <button
-                    className="text-xs text-muted-foreground underline hover:text-destructive disabled:opacity-50"
-                    onClick={() => void handleDelete(s.id)}
-                    disabled={busyId !== null}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-
-              {s.onTaskSeconds !== undefined ? (
-                <>
-                  <StatusBar
-                    onTaskSeconds={s.onTaskSeconds}
-                    distractedSeconds={s.distractedSeconds ?? 0}
-                    ambiguousSeconds={s.ambiguousSeconds ?? 0}
-                  />
-                  {s.categoryBreakdown !== undefined && (
-                    <CategoryBreakdown categories={s.categoryBreakdown} />
-                  )}
-                </>
-              ) : (
-                // Legacy session, created before the stats-based summary —
-                // keep showing its real AI-written summary rather than
-                // hiding data that already exists.
-                <>
-                  {s.summary !== undefined && s.summary.length > 0 && (
-                    <p className="text-sm text-muted-foreground">{s.summary}</p>
-                  )}
-                  {s.nextSteps !== undefined && s.nextSteps.length > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        Next steps
-                      </p>
-                      <ul className="list-inside list-disc space-y-0.5 text-sm text-muted-foreground">
-                        {s.nextSteps.map((step, i) => (
-                          <li key={i}>{step}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+export function PastSessions(): React.JSX.Element {
+  const [sessions, setSessions] = useState<PastSession[] | null>(null); const [error, setError] = useState<string | null>(null); const [trends, setTrends] = useState<SessionGetTrendsResponse | null>(null); const [trendsError, setTrendsError] = useState<string | null>(null); const [deleteId, setDeleteId] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  useEffect(() => { let cancelled = false; window.api.session.getPast({ limit: 20 }).then((res) => !cancelled && setSessions(res.sessions)).catch((err: unknown) => { console.error("[PastSessions] session:getPast failed:", err); if (!cancelled) setError("Past sessions aren't available right now."); }); return () => { cancelled = true; }; }, []);
+  useEffect(() => { let cancelled = false; window.api.session.getTrends({ days: TRENDS_DAYS }).then((res) => !cancelled && setTrends(res)).catch((err: unknown) => { console.error("[PastSessions] session:getTrends failed:", err); if (!cancelled) setTrendsError("The weekly snapshot isn't available right now."); }); return () => { cancelled = true; }; }, []);
+  const handleDelete = async (): Promise<void> => { if (!deleteId) return; setBusy(true); try { await window.api.session.delete({ sessionId: deleteId }); setSessions((previous) => previous?.filter((session) => session.id !== deleteId) ?? null); setDeleteId(null); toast.success("Session removed."); } catch (err) { console.error("[PastSessions] session:delete failed:", err); toast.error("That session couldn't be removed right now."); } finally { setBusy(false); } };
+  return <div className="mx-auto max-w-2xl space-y-6"><PageHeader eyebrow="Sessions" title="A little recent history" description="A simple record of the time you asked Perch to keep an eye on." />{trendsError && <p className="text-sm text-destructive">{trendsError}</p>}{trends ? trends.sessionCount > 0 && <SectionCard className="space-y-4"><div className="flex items-baseline justify-between"><h2 className="font-serif text-xl font-semibold">This week</h2><p className="text-xs text-muted-foreground">{trends.sessionCount} session{trends.sessionCount === 1 ? "" : "s"} in the last {TRENDS_DAYS} days</p></div><StatusBar onTaskSeconds={trends.onTaskSeconds} distractedSeconds={trends.distractedSeconds} ambiguousSeconds={trends.ambiguousSeconds} /><CategoryBreakdown categories={trends.categoryBreakdown} /></SectionCard> : <LoadingCard />}{error && <p className="text-sm text-destructive">{error}</p>}{!error && sessions === null && <LoadingCard />}{sessions?.length === 0 && <SectionCard><p className="font-serif text-lg font-semibold">No sessions yet</p><p className="mt-1 text-sm text-muted-foreground">Start a session when you want a record to return to.</p></SectionCard>}{sessions && sessions.length > 0 && <div className="space-y-6">{groupSessions(sessions).map(([date, entries]) => <section key={date} className="space-y-2"><h2 className="px-1 text-xs font-semibold uppercase tracking-[0.14em] text-clay">{date}</h2><div className="space-y-2">{entries.map((session) => <SectionCard key={session.id} className="space-y-3 py-4"><div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-semibold">{session.task}</h3><p className="mt-1 text-xs text-muted-foreground">Started at {timeLabel(session.startedAt)}</p></div><Button variant="quiet" className="min-h-0 px-2 py-1 text-xs hover:text-destructive" disabled={busy} onClick={() => setDeleteId(session.id)}>Delete</Button></div>{session.onTaskSeconds !== undefined ? <><StatusBar onTaskSeconds={session.onTaskSeconds} distractedSeconds={session.distractedSeconds ?? 0} ambiguousSeconds={session.ambiguousSeconds ?? 0} />{session.categoryBreakdown && <CategoryBreakdown categories={session.categoryBreakdown} />}</> : <div className="space-y-2 text-sm text-muted-foreground">{session.summary && <p>{session.summary}</p>}{session.nextSteps?.length ? <ul className="list-inside list-disc space-y-1">{session.nextSteps.map((step, index) => <li key={index}>{step}</li>)}</ul> : null}</div>}</SectionCard>)}</div></section>)}</div>}<ConfirmDialog open={deleteId !== null} onOpenChange={(open) => !open && !busy && setDeleteId(null)} title="Remove this session?" description="This removes the saved session from your history. It can’t be restored." confirmLabel="Remove session" busy={busy} onConfirm={() => void handleDelete()} /></div>;
 }

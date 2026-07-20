@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { Button, PageHeader, SectionCard } from "./ui";
 
 type Step =
   | "loading"
@@ -10,7 +11,7 @@ type Step =
   | "variants"
   | "saved";
 
-type StageName = "calm" | "gentle" | "upset" | "breakdown";
+type StageName = "calm" | "gentle" | "upset" | "breakdown" | "hello";
 type CellStatus = "pending" | "generating" | "done" | "error";
 
 interface CellState {
@@ -19,13 +20,14 @@ interface CellState {
 }
 
 const VARIANT_STAGES: Array<{
-  name: "gentle" | "upset" | "breakdown";
-  number: 1 | 2 | 3;
+  name: "gentle" | "upset" | "breakdown" | "hello";
+  number: 1 | 2 | 3 | 4;
   label: string;
 }> = [
   { name: "gentle", number: 1, label: "Gentle" },
   { name: "upset", number: 2, label: "Upset" },
   { name: "breakdown", number: 3, label: "Breakdown" },
+  { name: "hello", number: 4, label: "Hello wave" },
 ];
 
 const EMPTY_CELL: CellState = { status: "pending", image: null };
@@ -87,6 +89,7 @@ export function MascotSetup({ onBack }: Props): React.JSX.Element {
     gentle: EMPTY_CELL,
     upset: EMPTY_CELL,
     breakdown: EMPTY_CELL,
+    hello: EMPTY_CELL,
   });
 
   useEffect(() => {
@@ -100,8 +103,8 @@ export function MascotSetup({ onBack }: Props): React.JSX.Element {
   }, []);
 
   const generateVariantCell = async (
-    name: "gentle" | "upset" | "breakdown",
-    stageNumber: 1 | 2 | 3,
+    name: "gentle" | "upset" | "breakdown" | "hello",
+    stageNumber: 1 | 2 | 3 | 4,
   ): Promise<void> => {
     setCells((prev) => ({
       ...prev,
@@ -182,6 +185,7 @@ export function MascotSetup({ onBack }: Props): React.JSX.Element {
       gentle: EMPTY_CELL,
       upset: EMPTY_CELL,
       breakdown: EMPTY_CELL,
+      hello: EMPTY_CELL,
     });
     setStep("photo");
   };
@@ -221,6 +225,7 @@ export function MascotSetup({ onBack }: Props): React.JSX.Element {
     try {
       await window.api.mascot.save();
       setStep("saved");
+      toast.success("Mascot saved.");
     } catch (err) {
       console.error("[MascotSetup] save failed:", err);
       setErrorMessage("Couldn't save the mascot — try again.");
@@ -230,21 +235,13 @@ export function MascotSetup({ onBack }: Props): React.JSX.Element {
   };
 
   const allDone = (
-    ["calm", "gentle", "upset", "breakdown"] as StageName[]
+    ["calm", "gentle", "upset", "breakdown", "hello"] as StageName[]
   ).every((name) => cells[name].status === "done");
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="w-full max-w-md space-y-6 rounded-lg bg-card p-8 text-card-foreground shadow-md">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Customize mascot</h1>
-          <button
-            className="text-sm text-muted-foreground hover:text-foreground"
-            onClick={onBack}
-          >
-            Back
-          </button>
-        </div>
+    <div className="mx-auto max-w-2xl space-y-6">
+      <PageHeader eyebrow="Mascot studio" title="Create a mascot" description="Start with a photo, then review the base, three expressions, and a hello wave." action={<Button variant="quiet" onClick={onBack}>Back to mascots</Button>} />
+      <SectionCard className="space-y-6">
 
         {step === "loading" && (
           <p className="text-sm text-muted-foreground">Loading…</p>
@@ -264,15 +261,7 @@ export function MascotSetup({ onBack }: Props): React.JSX.Element {
               Choose a photo — yourself, a pet, a drawing, whatever you want
               your mascot to be based on.
             </p>
-            <button
-              className={cn(
-                "w-full rounded-md border border-input bg-background px-4 py-2 text-sm",
-                "hover:bg-accent hover:text-accent-foreground",
-              )}
-              onClick={() => void handleSelectPhoto()}
-            >
-              Choose photo
-            </button>
+            <Button variant="secondary" className="w-full" onClick={() => void handleSelectPhoto()}>Choose photo</Button>
 
             {photoPreview !== null && (
               <>
@@ -281,15 +270,7 @@ export function MascotSetup({ onBack }: Props): React.JSX.Element {
                   alt="Selected"
                   className="mx-auto h-40 w-40 rounded-md object-cover"
                 />
-                <button
-                  className={cn(
-                    "w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground",
-                    "hover:bg-primary/90",
-                  )}
-                  onClick={() => void handleGenerate()}
-                >
-                  Generate mascot
-                </button>
+                <Button className="w-full" onClick={() => void handleGenerate()}>Generate mascot</Button>
               </>
             )}
           </div>
@@ -321,34 +302,10 @@ export function MascotSetup({ onBack }: Props): React.JSX.Element {
               className="mx-auto h-40 w-40 rounded-md bg-muted object-contain"
               style={{ imageRendering: "pixelated" }}
             />
-            <button
-              className={cn(
-                "w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground",
-                "hover:bg-primary/90",
-              )}
-              onClick={handleApproveBase}
-            >
-              Use this
-            </button>
+            <Button className="w-full" onClick={handleApproveBase}>Use this</Button>
             <div className="flex gap-2">
-              <button
-                className={cn(
-                  "flex-1 rounded-md border border-input bg-background px-4 py-2 text-sm",
-                  "hover:bg-accent hover:text-accent-foreground",
-                )}
-                onClick={() => void handleGenerate()}
-              >
-                Try again
-              </button>
-              <button
-                className={cn(
-                  "flex-1 rounded-md border border-input bg-background px-4 py-2 text-sm",
-                  "hover:bg-accent hover:text-accent-foreground",
-                )}
-                onClick={handleChooseDifferentPhoto}
-              >
-                Choose a different photo
-              </button>
+              <Button variant="secondary" className="flex-1" onClick={() => void handleGenerate()}>Try again</Button>
+              <Button variant="secondary" className="flex-1" onClick={handleChooseDifferentPhoto}>Choose a different photo</Button>
             </div>
           </div>
         )}
@@ -356,7 +313,7 @@ export function MascotSetup({ onBack }: Props): React.JSX.Element {
         {step === "variants" && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Generating the other three expressions.
+              Generating the three expressions and a hello wave.
             </p>
             <div className="grid grid-cols-2 gap-4">
               <StageCell
@@ -375,38 +332,21 @@ export function MascotSetup({ onBack }: Props): React.JSX.Element {
                 />
               ))}
             </div>
-            <button
-              className={cn(
-                "w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground",
-                "hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50",
-              )}
-              disabled={!allDone || saving}
-              onClick={() => void handleSave()}
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
+            <Button className="w-full" disabled={!allDone || saving} onClick={() => void handleSave()}>{saving ? "Saving…" : "Save mascot"}</Button>
           </div>
         )}
 
         {step === "saved" && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">Mascot saved.</p>
-            <button
-              className={cn(
-                "w-full rounded-md border border-input bg-background px-4 py-2 text-sm",
-                "hover:bg-accent hover:text-accent-foreground",
-              )}
-              onClick={onBack}
-            >
-              Done
-            </button>
+            <Button variant="secondary" className="w-full" onClick={onBack}>Back to mascots</Button>
           </div>
         )}
 
         {errorMessage !== null && (
           <p className="text-sm text-destructive">{errorMessage}</p>
         )}
-      </div>
+      </SectionCard>
     </div>
   );
 }

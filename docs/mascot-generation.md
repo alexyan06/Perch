@@ -10,8 +10,8 @@
 
 Extends the mascot companion (PRD §6.3/§6.6) with a one-time setup flow: the user
 uploads a photo of anything reasonable (themselves, a pet, a drawing) and it's
-converted into a small pixel-art sprite set — one image per nudge stage
-(calm / gentle / upset / breakdown) — that then drives the existing always-on-top
+converted into a small pixel-art sprite set — four nudge stages plus a hello wave
+(calm / gentle / upset / breakdown / hello) — that then drives the existing always-on-top
 mascot window exactly as hand-authored art would have.
 
 This is additive to the core loop. Session monitoring, classification, and
@@ -23,9 +23,9 @@ appearance.
 
 Full-detail, photorealistic-style generation makes cross-image consistency hard:
 more surface area (lighting, proportions, fine detail) for the model to drift on
-between the 4 separate generations. Committing to a **retro NES/SNES-style pixel
+between the 5 separate generations. Committing to a **retro NES/SNES-style pixel
 sprite** at a small, fixed resolution shrinks that surface area a lot — fewer
-pixels, a locked palette, hard edges, no anti-aliasing — which makes "all 4
+pixels, a locked palette, hard edges, no anti-aliasing — which makes "all 5
 states look like the same character, same size, same proportions" tractable
 instead of a prompt-engineering guessing game. It also happens to fit the
 product's tone well.
@@ -51,17 +51,17 @@ later from a "Customize Mascot" settings entry.
 3. **Review checkpoint** — user accepts, regenerates (new roll, same photo),
    or picks a different photo. Generation is nondeterministic, so this gate
    matters regardless of API cost.
-4. **Generate the 3 stage variants** — once the base is approved, main makes 3
+4. **Generate the 3 stage variants and hello wave** — once the base is approved, main makes 4
    more calls, each passing the **approved base sprite plus any other
    already-approved stage sprites** back in as character reference images
    (not the original photo), with a stage-specific emotion prompt.
    OpenAI's image-edit API accepts multiple reference images per call — using
    every previously-approved sprite as a reference, not just the base alone,
    reinforces consistency further than chaining off a single image would. By
-   the time stage 3 generates: references = [base, gentle, upset].
-5. **Final review grid** — all 4 states shown together. Any single stage that
+   the time the hello wave generates: references = [base, gentle, upset, breakdown].
+5. **Final review grid** — all 5 assets shown together. Any single stage that
    drifted can be regenerated on its own without redoing the set.
-6. **Save** — main writes the 4 sprites to disk and records minimal metadata
+6. **Save** — main writes the 5 sprites to disk and records minimal metadata
    (§6). This intentionally persists — it's a user-owned generated asset, not
    a surveillance screenshot, so it doesn't conflict with the "screenshots are
    never persisted" rule.
@@ -131,12 +131,13 @@ character's identity.
 | 1 — Gentle     | mildly concerned, perked up, noticing something |
 | 2 — Noticeable | visibly upset, agitated                         |
 | 3 — Direct     | breaking down — crying, falling apart           |
+| 4 — Hello      | smiling and waving one hand toward the viewer   |
 
 **Real-world edge cases these templates now mitigate** (found from actual use, in the same spirit as the empirically-confirmed chroma-key notes in §5 — these are prompt-level mitigations, not guaranteed fixes, since there's no automatic detection or retry if the model still gets it wrong):
 
 - **Incomplete fills.** A generated sprite from a real photo of a person in a jersey came back with one shoulder/collar area as a patchy, unfinished-looking region instead of solid color, next to a cleanly-filled other sleeve. The prompt now explicitly states that partial/unfinished rendering is unacceptable.
 - **Multiple subjects.** A photo with more than one subject (e.g. a person and a pet) previously had no guidance on keeping both, or on making stage variants change expression for all of them together rather than just one.
-- **Non-human subjects.** A photo of something without a face (an object, etc.) had no guidance that the sprite still needs expressive eyes/mouth — required regardless of source content, since the mascot's whole job is emoting across all 4 stages.
+- **Non-human subjects.** A photo of something without a face (an object, etc.) had no guidance that the sprite still needs expressive eyes/mouth — required regardless of source content, since the mascot's whole job is emoting across all 5 assets.
 
 ## 5. Consistency Backstop: Deterministic Post-Processing
 
@@ -152,7 +153,7 @@ the API call returns:
 2. Chroma-key removal (see below) to produce real transparency.
 3. Quantize to the fixed palette size.
 
-This runs identically on all 4 generations, so "same size and proportions" is
+This runs identically on all 5 generations, so "same size and proportions" is
 guaranteed by code, not hoped for from the prompt.
 
 **Transparency is chroma-keyed, not real alpha — confirmed empirically, not
@@ -191,7 +192,7 @@ collection is small, file-based, and doesn't need relational queries — just
 ```
 userData/mascots/
   <mascotId>/
-    calm.png, gentle.png, upset.png, breakdown.png
+    calm.png, gentle.png, upset.png, breakdown.png, hello.png
     metadata.json   → { createdAt: string }
   <mascotId2>/ ...
   selected.json     → { selectedMascotId: string | null }
@@ -237,7 +238,7 @@ Response: `{ image: string /* data URL, post-processed */ }`
 
 ### `mascot:generateStage`
 
-Request: `{ stage: 1 | 2 | 3 }`
+Request: `{ stage: 1 | 2 | 3 | 4 }`
 Response: `{ image: string }`
 
 ### `mascot:save`
@@ -248,7 +249,7 @@ Response: `{ savedAt: string }`
 ### `mascot:getActive`
 
 Request: `{}`
-Response: `{ calm: string; gentle: string; upset: string; breakdown: string } | null`
+Response: `{ calm: string; gentle: string; upset: string; breakdown: string; hello: string } | null`
 
 ## 9. Provider & API Key Handling
 

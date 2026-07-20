@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Toaster } from "sonner";
 import { SessionSetup } from "./components/SessionSetup";
 import { SessionActive } from "./components/SessionActive";
 import { PastSessions } from "./components/PastSessions";
@@ -6,6 +7,7 @@ import { MascotSetup } from "./components/MascotSetup";
 import { MascotLibrary } from "./components/MascotLibrary";
 import { PermissionsOnboarding } from "./components/PermissionsOnboarding";
 import { SessionSummary } from "./components/SessionSummary";
+import { AppShell, type ShellScreen } from "./components/AppShell";
 import type { SessionSummaryReadyPayload } from "../../shared/ipc";
 
 type Screen = "setup" | "active" | "past" | "mascotSetup" | "mascotLibrary";
@@ -14,6 +16,7 @@ export function App(): React.JSX.Element {
   const [screen, setScreen] = useState<Screen>("setup");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<string | null>(null);
+  const [activeTask, setActiveTask] = useState("");
   const [permissionsGateNeeded, setPermissionsGateNeeded] = useState<
     boolean | null
   >(null);
@@ -48,21 +51,38 @@ export function App(): React.JSX.Element {
     });
   }, []);
 
-  const handleStarted = (id: string, at: string): void => {
+  const handleStarted = (id: string, at: string, sessionTask: string): void => {
     setSessionId(id);
     setStartedAt(at);
+    setActiveTask(sessionTask);
     setScreen("active");
   };
 
   const handleEnded = (): void => {
     setSessionId(null);
     setStartedAt(null);
+    setActiveTask("");
     setScreen("setup");
   };
 
+  const clearSetup = (): void => {
+    setTask("");
+    setDistractions("");
+    setApproved("");
+  };
+
+  const navigate = (next: ShellScreen): void => {
+    setPendingSummary(null);
+    setScreen(next);
+  };
+
+  const renderShell = (content: React.ReactNode, selected: ShellScreen): React.JSX.Element => (
+    <AppShell screen={selected} onNavigate={navigate}>{content}</AppShell>
+  );
+
   if (permissionsGateNeeded === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-canvas">
         <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     );
@@ -80,46 +100,44 @@ export function App(): React.JSX.Element {
   // race with handleEnded's own reset-to-setup deterministically, since both
   // fire around the same moment but only one of them carries real data.
   if (pendingSummary !== null) {
-    return (
-      <SessionSummary
+    return <><Toaster richColors position="bottom-right" /><AppShell screen="setup" onNavigate={navigate}><SessionSummary
         data={pendingSummary}
-        onDone={() => {
+        onStartAnother={() => {
           setPendingSummary(null);
+          clearSetup();
           setScreen("setup");
         }}
-      />
-    );
+        onViewSessions={() => { setPendingSummary(null); setScreen("past"); }}
+      /></AppShell></>;
   }
 
   if (screen === "active" && sessionId !== null && startedAt !== null) {
     return (
-      <SessionActive
-        sessionId={sessionId}
-        startedAt={startedAt}
-        onEnded={handleEnded}
-      />
+      <>
+        <Toaster richColors position="bottom-right" />
+        <SessionActive
+          sessionId={sessionId}
+          startedAt={startedAt}
+          task={activeTask}
+          onEnded={handleEnded}
+        />
+      </>
     );
   }
 
   if (screen === "past") {
-    return <PastSessions onBack={() => setScreen("setup")} />;
+    return <><Toaster richColors position="bottom-right" />{renderShell(<PastSessions />, "past")}</>;
   }
 
   if (screen === "mascotSetup") {
-    return <MascotSetup onBack={() => setScreen("mascotLibrary")} />;
+    return <><Toaster richColors position="bottom-right" />{renderShell(<MascotSetup onBack={() => setScreen("mascotLibrary")} />, "mascotLibrary")}</>;
   }
 
   if (screen === "mascotLibrary") {
-    return (
-      <MascotLibrary
-        onBack={() => setScreen("setup")}
-        onCreateNew={() => setScreen("mascotSetup")}
-      />
-    );
+    return <><Toaster richColors position="bottom-right" />{renderShell(<MascotLibrary onCreateNew={() => setScreen("mascotSetup")} />, "mascotLibrary")}</>;
   }
 
-  return (
-    <SessionSetup
+  return <><Toaster richColors position="bottom-right" />{renderShell(<SessionSetup
       task={task}
       onTaskChange={setTask}
       distractions={distractions}
@@ -127,8 +145,5 @@ export function App(): React.JSX.Element {
       approved={approved}
       onApprovedChange={setApproved}
       onStarted={handleStarted}
-      onViewPast={() => setScreen("past")}
-      onCustomizeMascot={() => setScreen("mascotLibrary")}
-    />
-  );
+    />, "setup")}</>;
 }

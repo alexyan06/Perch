@@ -79,7 +79,7 @@ export interface MascotGenerateBaseResponse {
 }
 
 export interface MascotGenerateStageRequest {
-  stage: 1 | 2 | 3;
+  stage: 1 | 2 | 3 | 4;
 }
 
 export interface MascotGenerateStageResponse {
@@ -96,6 +96,7 @@ export interface MascotGetActiveResponse {
   gentle: string;
   upset: string;
   breakdown: string;
+  hello: string;
 }
 
 export interface MascotListEntry {

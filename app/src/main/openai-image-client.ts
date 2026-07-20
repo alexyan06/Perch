@@ -98,13 +98,14 @@ export async function generateBaseSprite(params: {
   ]);
 }
 
-const EMOTION_DESCRIPTIONS: Record<1 | 2 | 3, string> = {
+const EMOTION_DESCRIPTIONS: Record<1 | 2 | 3 | 4, string> = {
   1: "mildly concerned, perked up, noticing something",
   2: "visibly upset, agitated",
   3: "breaking down — crying, falling apart",
+  4: "a warm, friendly hello: smiling and clearly waving one hand toward the viewer",
 };
 
-function buildStagePrompt(stage: 1 | 2 | 3): string {
+export function buildStagePrompt(stage: 1 | 2 | 3 | 4): string {
   return `Using the attached sprite(s) as exact character references, generate a new
 retro 16-bit-style pixel art sprite of the exact same character(s), in the
 identical style, ${CANVAS_SIZE}px canvas, same limited palette, same pose
@@ -124,7 +125,7 @@ character's identity.`;
 }
 
 export async function generateStageVariant(params: {
-  stage: 1 | 2 | 3;
+  stage: 1 | 2 | 3 | 4;
   references: Array<{ base64: string; mimeType: string }>;
 }): Promise<GeneratedSprite> {
   return runImageEdit(

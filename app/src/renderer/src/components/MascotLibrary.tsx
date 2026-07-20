@@ -1,162 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import type { MascotListEntry } from "../../../shared/ipc";
+import type { MascotGetActiveResponse, MascotListEntry } from "../../../shared/ipc";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { Button, LoadingCard, PageHeader, SectionCard } from "./ui";
 
-interface Props {
-  onBack: () => void;
-  onCreateNew: () => void;
+interface Props { onCreateNew: () => void; }
+const GREETINGS = ["Hey there. I brought a wave.", "There you are. Hello from your mascot.", "A friendly wave for you."];
+function formatCreatedAt(iso: string): string { return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
+
+export function MascotLibrary({ onCreateNew }: Props): React.JSX.Element {
+  const [mascots, setMascots] = useState<MascotListEntry[] | null>(null); const [selectedId, setSelectedId] = useState<string | null>(null); const [activeMascot, setActiveMascot] = useState<MascotGetActiveResponse | null>(null); const [error, setError] = useState<string | null>(null); const [busyId, setBusyId] = useState<string | null>(null); const [deleteId, setDeleteId] = useState<string | null>(null); const [greeting, setGreeting] = useState<string | null>(null); const greetingTimer = useRef<ReturnType<typeof setTimeout> | null>(null); const greetingIndex = useRef(0);
+  const refresh = async (): Promise<void> => { try { const result = await window.api.mascot.list(); const active = await window.api.mascot.getActive(); setMascots(result.mascots); setSelectedId(result.selectedId); setActiveMascot(active); } catch (err) { console.error("[MascotLibrary] mascot:list failed:", err); setError("Saved mascots aren't available right now."); } };
+  useEffect(() => { void refresh(); }, []);
+  useEffect(() => () => { if (greetingTimer.current !== null) clearTimeout(greetingTimer.current); }, []);
+  const handleSelect = async (id: string | null): Promise<void> => { setBusyId(id ?? "default"); setError(null); setGreeting(null); try { await window.api.mascot.select({ id }); const active = await window.api.mascot.getActive(); setSelectedId(id); setActiveMascot(active); toast.success(id === null ? "Default mascot selected." : "Mascot selected."); } catch (err) { console.error("[MascotLibrary] mascot:select failed:", err); setError("That mascot couldn't be selected right now."); } finally { setBusyId(null); } };
+  const handleDelete = async (): Promise<void> => { if (!deleteId) return; setBusyId(deleteId); try { await window.api.mascot.delete({ id: deleteId }); await refresh(); setDeleteId(null); setGreeting(null); toast.success("Mascot removed."); } catch (err) { console.error("[MascotLibrary] mascot:delete failed:", err); toast.error("That mascot couldn't be removed right now."); } finally { setBusyId(null); } };
+  const greet = (): void => { const next = GREETINGS[greetingIndex.current % GREETINGS.length]; greetingIndex.current += 1; setGreeting(next); if (greetingTimer.current !== null) clearTimeout(greetingTimer.current); greetingTimer.current = setTimeout(() => setGreeting(null), 4200); };
+  const selected = mascots?.find((mascot) => mascot.id === selectedId); const heroImage = greeting !== null && activeMascot !== null ? activeMascot.hello : selected?.thumbnail;
+  return <div className="mx-auto max-w-2xl space-y-6"><PageHeader eyebrow="Mascot" title="Your little companion" description="Choose a saved mascot or make a new one from a photo." action={<Button onClick={onCreateNew}>Create mascot</Button>} />{error && <p className="text-sm text-destructive">{error}</p>}{mascots === null && !error && <LoadingCard />}{mascots && <><SectionCard className="flex min-h-44 items-center justify-center bg-warm/25"><div className="text-center"><button type="button" className="rounded-lg outline-none transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-ring" aria-label="Say hello to your selected mascot" aria-describedby={greeting ? "mascot-greeting" : undefined} onClick={greet}>{heroImage ? <img src={heroImage} alt="Your selected mascot" className="mx-auto h-28 w-28 object-contain" style={{ imageRendering: "pixelated" }} /> : <div className="mx-auto grid h-28 w-28 place-items-center rounded-lg bg-warm font-serif text-4xl" aria-hidden="true">P</div>}</button>{greeting ? <p id="mascot-greeting" role="status" className="mx-auto mt-3 max-w-xs rounded-md border border-clay/20 bg-card px-3 py-2 text-sm text-foreground shadow-sm">{greeting}</p> : <p className="mt-2 text-sm font-medium">{selected ? "Selected mascot" : "Default mascot"}</p>}</div></SectionCard><section className="space-y-3"><div><h2 className="font-serif text-xl font-semibold">Saved mascots</h2><p className="text-sm text-muted-foreground">Select one to use it in your next session.</p></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><MascotTile selected={selectedId === null} busy={busyId !== null} label="Default" onSelect={() => void handleSelect(null)} />{mascots.map((mascot) => <MascotTile key={mascot.id} mascot={mascot} selected={selectedId === mascot.id} busy={busyId !== null} label={formatCreatedAt(mascot.createdAt)} onSelect={() => void handleSelect(mascot.id)} onDelete={() => setDeleteId(mascot.id)} />)}</div></section></>}<ConfirmDialog open={deleteId !== null} onOpenChange={(open) => !open && busyId === null && setDeleteId(null)} title="Remove this mascot?" description="This removes the saved mascot. Your current selection will stay available until you choose another one." confirmLabel="Remove mascot" busy={deleteId !== null && busyId === deleteId} onConfirm={() => void handleDelete()} /></div>;
 }
-
-function formatCreatedAt(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-}
-
-export function MascotLibrary({
-  onBack,
-  onCreateNew,
-}: Props): React.JSX.Element {
-  const [mascots, setMascots] = useState<MascotListEntry[] | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  // "default" or a mascot id — whichever select/delete call is in flight.
-  const [busyId, setBusyId] = useState<string | null>(null);
-
-  const refresh = async (): Promise<void> => {
-    try {
-      const res = await window.api.mascot.list();
-      setMascots(res.mascots);
-      setSelectedId(res.selectedId);
-    } catch (err) {
-      console.error("[MascotLibrary] mascot:list failed:", err);
-      setError("Couldn't load your saved mascots right now.");
-    }
-  };
-
-  useEffect(() => {
-    void refresh();
-  }, []);
-
-  const handleSelect = async (id: string | null): Promise<void> => {
-    setBusyId(id ?? "default");
-    setError(null);
-    try {
-      await window.api.mascot.select({ id });
-      setSelectedId(id);
-    } catch (err) {
-      console.error("[MascotLibrary] mascot:select failed:", err);
-      setError("Couldn't switch mascots right now.");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleDelete = async (id: string): Promise<void> => {
-    if (!window.confirm("Delete this mascot? This can't be undone.")) return;
-    setBusyId(id);
-    setError(null);
-    try {
-      await window.api.mascot.delete({ id });
-      await refresh();
-    } catch (err) {
-      console.error("[MascotLibrary] mascot:delete failed:", err);
-      setError("Couldn't delete that mascot right now.");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  return (
-    <div className="flex min-h-screen justify-center bg-background py-12">
-      <div className="w-full max-w-lg space-y-6 px-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Mascot</h1>
-          <button
-            className="text-sm text-muted-foreground hover:text-foreground"
-            onClick={onBack}
-          >
-            Back
-          </button>
-        </div>
-
-        {error !== null && <p className="text-sm text-destructive">{error}</p>}
-
-        {mascots === null && error === null && (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        )}
-
-        {mascots !== null && (
-          <div className="grid grid-cols-3 gap-4">
-            <div
-              className={cn(
-                "space-y-2 rounded-lg border p-3 text-center",
-                selectedId === null ? "border-foreground" : "border-input",
-              )}
-            >
-              <button
-                className="mx-auto flex h-16 w-16 items-center justify-center rounded-md bg-muted text-xs text-muted-foreground disabled:opacity-50"
-                onClick={() => void handleSelect(null)}
-                disabled={busyId !== null}
-              >
-                Default
-              </button>
-              {selectedId === null && (
-                <p className="text-xs font-medium text-foreground">Selected</p>
-              )}
-            </div>
-
-            {mascots.map((m) => (
-              <div
-                key={m.id}
-                className={cn(
-                  "space-y-2 rounded-lg border p-3 text-center",
-                  selectedId === m.id ? "border-foreground" : "border-input",
-                )}
-              >
-                <button
-                  className="mx-auto block h-16 w-16 rounded-md bg-muted disabled:opacity-50"
-                  onClick={() => void handleSelect(m.id)}
-                  disabled={busyId !== null}
-                >
-                  <img
-                    src={m.thumbnail}
-                    alt=""
-                    className="h-full w-full object-contain"
-                    style={{ imageRendering: "pixelated" }}
-                  />
-                </button>
-                <p className="text-xs text-muted-foreground">
-                  {formatCreatedAt(m.createdAt)}
-                </p>
-                {selectedId === m.id && (
-                  <p className="text-xs font-medium text-foreground">
-                    Selected
-                  </p>
-                )}
-                <button
-                  className="text-xs text-muted-foreground underline hover:text-destructive disabled:opacity-50"
-                  onClick={() => void handleDelete(m.id)}
-                  disabled={busyId !== null}
-                >
-                  Delete
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <button
-          className={cn(
-            "w-full rounded-md border border-input bg-background px-4 py-2 text-sm",
-            "hover:bg-accent hover:text-accent-foreground",
-          )}
-          onClick={onCreateNew}
-        >
-          Create new
-        </button>
-      </div>
-    </div>
-  );
-}
+function MascotTile({ mascot, selected, busy, label, onSelect, onDelete }: { mascot?: MascotListEntry; selected: boolean; busy: boolean; label: string; onSelect: () => void; onDelete?: () => void }): React.JSX.Element { return <div className={cn("rounded-lg border bg-card p-3 text-center transition-colors", selected ? "border-clay ring-1 ring-clay/25" : "border-border")}><button className="mx-auto block disabled:opacity-50" onClick={onSelect} disabled={busy}>{mascot ? <img src={mascot.thumbnail} alt={`Mascot saved ${label}`} className="h-20 w-20 object-contain" style={{ imageRendering: "pixelated" }} /> : <div className="grid h-20 w-20 place-items-center rounded-md bg-warm font-serif text-2xl">P</div>}</button><p className="mt-2 text-xs text-muted-foreground">{selected ? "Selected" : label}</p>{onDelete && <button className="mt-1 text-xs text-muted-foreground hover:text-destructive disabled:opacity-50" onClick={onDelete} disabled={busy}>Remove</button>}</div>; }

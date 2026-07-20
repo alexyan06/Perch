@@ -122,24 +122,24 @@ Response: `{ image: string }` (data URL, already post-processed)
 
 ### `mascot:generateStage`
 
-Generates one of the 3 expression variants, using the base sprite plus any other already-generated earlier stages as character references (e.g. `breakdown` references `calm`+`gentle`+`upset`) — see `docs/mascot-generation.md` §3/§4. Same failure handling as `mascot:generateBase`. Callable repeatedly to regenerate a single stage without affecting the others.
+Generates one of the 3 expression variants or the hello-wave pose, using the base sprite plus any other already-generated earlier stages as character references (e.g. `hello` references `calm`+`gentle`+`upset`+`breakdown`) — see `docs/mascot-generation.md` §3/§4. Same failure handling as `mascot:generateBase`. Callable repeatedly to regenerate a single stage without affecting the others.
 
-Request: `{ stage: 1 | 2 | 3 }`
+Request: `{ stage: 1 | 2 | 3 | 4 }`
 Response: `{ image: string }` (data URL, already post-processed)
 
 ### `mascot:save`
 
-Writes all 4 currently-generated sprites as a **new** entry under `userData/mascots/<mascotId>/{calm,gentle,upset,breakdown}.png` plus `metadata.json` (`{ createdAt }`), and selects it as the active mascot — matches the pre-library behavior where saving meant "this is now my mascot." Rejects if any of the 4 stages hasn't succeeded yet. `id` uses the same ID scheme as session IDs (`newId()` in `db.ts`).
+Writes all 5 currently-generated sprites as a **new** entry under `userData/mascots/<mascotId>/{calm,gentle,upset,breakdown,hello}.png` plus `metadata.json` (`{ createdAt }`), and selects it as the active mascot — matches the pre-library behavior where saving meant "this is now my mascot." Rejects if any of the 5 stages hasn't succeeded yet. `id` uses the same ID scheme as session IDs (`newId()` in `db.ts`).
 
 Request: `{}`
 Response: `{ id: string; savedAt: string }`
 
 ### `mascot:getActive`
 
-Reads whichever mascot is currently selected (see `mascot:select`), used by the actual mascot window (`Mascot.tsx`) to decide whether to render the real generated sprites or fall back to the bundled placeholder. All-or-nothing: `null` if nothing is selected, or if the directory, any of the 4 files, or a read of any of them fails — never a partial mix of real and placeholder art.
+Reads whichever mascot is currently selected (see `mascot:select`), used by the mascot window and Mascot page to decide whether to render the real generated sprites or fall back to the bundled placeholder. All-or-nothing: `null` if nothing is selected, or if the directory, any of the 5 files, or a read of any of them fails — never a partial mix of real and placeholder art.
 
 Request: `{}`
-Response: `{ calm: string; gentle: string; upset: string; breakdown: string } | null` (each a data URL)
+Response: `{ calm: string; gentle: string; upset: string; breakdown: string; hello: string } | null` (each a data URL)
 
 ### `mascot:list`
 

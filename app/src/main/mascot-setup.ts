@@ -4,18 +4,20 @@ import {
 } from "./openai-image-client";
 import { postProcessSprite } from "./mascot-image";
 
-export type StageName = "calm" | "gentle" | "upset" | "breakdown";
+export type StageName = "calm" | "gentle" | "upset" | "breakdown" | "hello";
 export const STAGE_ORDER: StageName[] = [
   "calm",
   "gentle",
   "upset",
   "breakdown",
+  "hello",
 ];
-const STAGE_NUMBER: Record<StageName, 0 | 1 | 2 | 3> = {
+const STAGE_NUMBER: Record<StageName, 0 | 1 | 2 | 3 | 4> = {
   calm: 0,
   gentle: 1,
   upset: 2,
   breakdown: 3,
+  hello: 4,
 };
 
 export interface StageResult {
@@ -41,7 +43,7 @@ export function getSelectedPhotoPreviewDataUrl(): string | null {
 
 /**
  * Which earlier-stage raw images to hand the model as character references
- * for a given target stage — e.g. breakdown gets [calm, gentle, upset].
+ * for a given target asset — e.g. hello gets [calm, gentle, upset, breakdown].
  * Pure and exported so it's testable without a live API call: a stage that
  * failed or hasn't been generated yet is just skipped rather than blocking,
  * so "regenerate one stage without redoing the whole set" always works.
@@ -79,7 +81,7 @@ export async function generateBaseSprite(): Promise<string> {
 
 /** Returns a fully post-processed `data:image/png;base64,...` URL. */
 export async function generateStage(
-  name: "gentle" | "upset" | "breakdown",
+  name: "gentle" | "upset" | "breakdown" | "hello",
 ): Promise<string> {
   const references = buildReferenceList(stageResults, name);
   if (references.length === 0) {
@@ -89,7 +91,7 @@ export async function generateStage(
   }
 
   const { imageBase64, mimeType } = await generateStageVariant({
-    stage: STAGE_NUMBER[name] as 1 | 2 | 3,
+    stage: STAGE_NUMBER[name] as 1 | 2 | 3 | 4,
     references,
   });
 
@@ -102,7 +104,7 @@ export async function generateStage(
   return processedDataUrl;
 }
 
-/** All 4 processed sprites, or null if any stage hasn't succeeded yet. */
+/** All 5 processed sprites, or null if any stage hasn't succeeded yet. */
 export function getStagesForSaving(): Record<StageName, string> | null {
   const entries = STAGE_ORDER.map(
     (name) => [name, stageResults[name]?.processedDataUrl] as const,

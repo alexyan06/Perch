@@ -120,7 +120,6 @@ ipcMain.handle(
     }
     stopPolling = startPolling(id, req, messagePack);
     mascotWindow = createMascotWindow(id);
-    mainWindow?.hide();
     return { sessionId: id, startedAt };
   },
 );
@@ -246,12 +245,13 @@ ipcMain.handle(
 );
 
 const STAGE_NAME_BY_NUMBER: Record<
-  1 | 2 | 3,
-  "gentle" | "upset" | "breakdown"
+  1 | 2 | 3 | 4,
+  "gentle" | "upset" | "breakdown" | "hello"
 > = {
   1: "gentle",
   2: "upset",
   3: "breakdown",
+  4: "hello",
 };
 
 ipcMain.handle(
@@ -267,7 +267,7 @@ ipcMain.handle(
 ipcMain.handle("mascot:save", async (): Promise<MascotSaveResponse> => {
   const stages = getStagesForSaving();
   if (stages === null) {
-    throw new Error("[mascot:save] not all 4 stages are ready yet");
+    throw new Error("[mascot:save] not all 5 stages are ready yet");
   }
   return saveNewMascot(stages);
 });
@@ -372,6 +372,7 @@ function createWindow(): void {
     width: 900,
     height: 670,
     show: false,
+    backgroundColor: "#fbf7ee",
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),

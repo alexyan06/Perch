@@ -30,6 +30,11 @@ export default {
         },
         success: "hsl(var(--success))",
         warning: "hsl(var(--warning))",
+        canvas: "hsl(var(--canvas))",
+        panel: "hsl(var(--panel))",
+        sidebar: "hsl(var(--sidebar))",
+        warm: "hsl(var(--warm))",
+        clay: "hsl(var(--clay))",
         muted: {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
