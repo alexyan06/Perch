@@ -30,7 +30,7 @@ export function getDb(): Database.Database {
       timestamp TEXT NOT NULL,
       signal_type TEXT NOT NULL CHECK(signal_type IN ('native', 'browser', 'vision')),
       raw_signal TEXT NOT NULL,
-      classification TEXT NOT NULL CHECK(classification IN ('on_task', 'distraction', 'drift', 'ambiguous')),
+      classification TEXT NOT NULL CHECK(classification IN ('on_task', 'distraction', 'drift', 'ambiguous', 'paused')),
       reasoning TEXT
     );
 
@@ -42,6 +42,33 @@ export function getDb(): Database.Database {
       max_stage_reached INTEGER NOT NULL DEFAULT 0
     );
   `);
+
+  const classificationEventsSql = db
+    .prepare(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'classification_events'",
+    )
+    .get() as { sql: string } | undefined;
+  if (!classificationEventsSql?.sql.includes("'paused'")) {
+    const database = db;
+    database.transaction(() => {
+      database.exec("ALTER TABLE classification_events RENAME TO classification_events_legacy");
+      database.exec(`
+        CREATE TABLE classification_events (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL REFERENCES sessions(id),
+          timestamp TEXT NOT NULL,
+          signal_type TEXT NOT NULL CHECK(signal_type IN ('native', 'browser', 'vision')),
+          raw_signal TEXT NOT NULL,
+          classification TEXT NOT NULL CHECK(classification IN ('on_task', 'distraction', 'drift', 'ambiguous', 'paused')),
+          reasoning TEXT
+        );
+        INSERT INTO classification_events (id, session_id, timestamp, signal_type, raw_signal, classification, reasoning)
+        SELECT id, session_id, timestamp, signal_type, raw_signal, classification, reasoning
+        FROM classification_events_legacy;
+        DROP TABLE classification_events_legacy;
+      `);
+    })();
+  }
 
   const sessionColumns = db
     .prepare("PRAGMA table_info(sessions)")
@@ -232,7 +259,7 @@ export function insertClassificationEvent(event: {
   timestamp: string;
   signalType: "native" | "browser" | "vision";
   rawSignal: unknown;
-  classification: "on_task" | "distraction" | "drift" | "ambiguous";
+  classification: "on_task" | "distraction" | "drift" | "ambiguous" | "paused";
   reasoning?: string;
 }): void {
   getDb()
@@ -276,7 +303,7 @@ export function endDistractionInterval(
 export interface ClassificationEventForSummary {
   timestamp: string;
   signalType: "native" | "browser" | "vision";
-  classification: "on_task" | "distraction" | "drift" | "ambiguous";
+  classification: "on_task" | "distraction" | "drift" | "ambiguous" | "paused";
   reasoning: string | null;
   rawSignal: unknown;
 }
@@ -292,7 +319,7 @@ export function getClassificationEvents(
     .all(sessionId) as Array<{
     timestamp: string;
     signal_type: "native" | "browser" | "vision";
-    classification: "on_task" | "distraction" | "drift" | "ambiguous";
+    classification: "on_task" | "distraction" | "drift" | "ambiguous" | "paused";
     reasoning: string | null;
     raw_signal: string;
   }>;

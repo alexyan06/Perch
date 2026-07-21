@@ -10,6 +10,7 @@ function statusCopy(classification: Classification): { label: string; detail: st
   if (classification === "distraction") return { label: "A shift was noticed", detail: "Your mascot will share a note if it needs to." };
   if (classification === "drift") return { label: "A shift was noticed", detail: "Perch is still following the session." };
   if (classification === "ambiguous") return { label: "Monitoring", detail: "Perch is waiting for a clearer read." };
+  if (classification === "paused") return { label: "Waiting", detail: "Perch will continue when an active window is available." };
   return { label: "Getting started", detail: "Perch is getting this session ready." };
 }
 

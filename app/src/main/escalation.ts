@@ -34,6 +34,7 @@ export function createEscalationTracker(deps?: EscalationTrackerDeps): {
     task: string;
     distractionList: string[];
   }): Promise<EscalationResult>;
+  pause(now: number): void;
 } {
   const capture = deps?.captureScreenshot ?? captureActiveWindowScreenshot;
   const classify = deps?.classifyScreenshot ?? classifyScreenshot;
@@ -41,6 +42,14 @@ export function createEscalationTracker(deps?: EscalationTrackerDeps): {
   const dwellThresholdMs = deps?.dwellThresholdMs ?? DWELL_THRESHOLD_MS;
 
   let dwell: DwellState | null = null;
+  let pausedAt: number | null = null;
+
+  function resumeDwell(now: number): void {
+    if (dwell !== null && pausedAt !== null) {
+      dwell.ambiguousSince += now - pausedAt;
+    }
+    pausedAt = null;
+  }
 
   async function resolve(params: {
     sessionId: string;
@@ -51,6 +60,7 @@ export function createEscalationTracker(deps?: EscalationTrackerDeps): {
     task: string;
     distractionList: string[];
   }): Promise<EscalationResult> {
+    resumeDwell(Date.now());
     if (params.tier1Result !== "ambiguous") {
       dwell = null;
       return {
@@ -119,5 +129,10 @@ export function createEscalationTracker(deps?: EscalationTrackerDeps): {
     }
   }
 
-  return { resolve };
+  return {
+    resolve,
+    pause(now: number): void {
+      if (dwell !== null && pausedAt === null) pausedAt = now;
+    },
+  };
 }

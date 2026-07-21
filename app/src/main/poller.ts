@@ -2,6 +2,7 @@ import activeWin from "active-win";
 import { BrowserWindow, powerMonitor } from "electron";
 import { insertClassificationEvent } from "./db";
 import { classifyTier1 } from "./classifier";
+import { isTransparentForegroundSignal } from "./foreground-signal";
 import { getLatestBrowserSignal, onBrowserSignalChange } from "./ws-server";
 import { createEscalationTracker } from "./escalation";
 import { createNudgeTracker } from "./nudge";
@@ -73,12 +74,31 @@ export function startPolling(
 
     const appName = win?.owner.name ?? null;
     const windowTitle = win?.title ?? null;
+    const processId = win?.owner.processId ?? null;
 
     const isBrowser =
       appName !== null && BROWSER_APP_NAMES.includes(appName.toLowerCase());
 
     const browserSignal = isBrowser ? getLatestBrowserSignal() : null;
     const effectiveWindowTitle = browserSignal?.tabTitle ?? windowTitle;
+
+    const perchProcessIds = new Set(
+      BrowserWindow.getAllWindows()
+        .filter((window) => !window.isDestroyed())
+        .map((window) => window.webContents.getOSProcessId()),
+    );
+    if (
+      isTransparentForegroundSignal(
+        { appName, windowTitle: effectiveWindowTitle, processId },
+        perchProcessIds,
+      )
+    ) {
+      const now = Date.now();
+      escalationTracker.pause(now);
+      nudgeTracker.onTick("paused", now);
+      console.log("[poller] preserving prior activity during Perch/desktop interaction");
+      return;
+    }
 
     const tier1Result = classifyTier1(
       { appName, windowTitle: effectiveWindowTitle },

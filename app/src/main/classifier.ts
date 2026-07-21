@@ -1,4 +1,7 @@
-export type Tier1Result = "on_task" | "distraction" | "ambiguous";
+export type Tier1Result =
+  | "on_task"
+  | "distraction"
+  | "ambiguous";
 
 export interface NativeSignal {
   appName: string | null;

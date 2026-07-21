@@ -6,7 +6,6 @@ const STAGE_1_THRESHOLD_MS = 0;
 const STAGE_2_THRESHOLD_MS = 20_000;
 const STAGE_3_THRESHOLD_MS = 60_000;
 const RELAPSE_WINDOW_MS = 45_000;
-const REPEATED_RELAPSE_COUNT = 2;
 
 export type NudgeEvent =
   | {
@@ -35,7 +34,7 @@ export function createNudgeTracker(
   deps?: NudgeTrackerDeps,
 ): {
   onTick(
-    classification: "on_task" | "distraction" | "drift" | "ambiguous",
+    classification: "on_task" | "distraction" | "drift" | "ambiguous" | "paused",
     now: number,
   ): NudgeEvent;
 } {
@@ -46,14 +45,26 @@ export function createNudgeTracker(
   let distractionStartedAt = 0;
   let currentStage: NudgeStage = 0;
   let maxStageReached: NudgeStage = 0;
-  let relapseCount = 0;
   let lastClosedAt: number | null = null;
   let lastClosedMaxStage: NudgeStage = 0;
+  let pausedAt: number | null = null;
 
   function onTick(
-    classification: "on_task" | "distraction" | "drift" | "ambiguous",
+    classification: "on_task" | "distraction" | "drift" | "ambiguous" | "paused",
     now: number,
   ): NudgeEvent {
+    if (classification === "paused" || classification === "ambiguous") {
+      if (intervalId !== null && pausedAt === null) pausedAt = now;
+      return { type: "none" };
+    }
+
+    if (pausedAt !== null) {
+      // Desktop/no-window time is outside the focus assessment, so it does
+      // not advance an existing nudge stage when observation resumes.
+      distractionStartedAt += now - pausedAt;
+      pausedAt = null;
+    }
+
     if (classification === "on_task") {
       if (intervalId === null) return { type: "none" };
       end(intervalId, maxStageReached);
@@ -71,21 +82,17 @@ export function createNudgeTracker(
       currentStage = 0;
       maxStageReached = 0;
 
-      const isRelapse =
-        lastClosedAt !== null &&
-        lastClosedMaxStage >= 1 &&
-        now - lastClosedAt <= RELAPSE_WINDOW_MS;
-      if (isRelapse) relapseCount++;
     }
 
     const elapsedMs = now - distractionStartedAt;
     const elapsedStage = durationStage(elapsedMs);
-    let targetStage = elapsedStage;
-    if (relapseCount >= REPEATED_RELAPSE_COUNT) {
-      targetStage = Math.max(targetStage, 3) as NudgeStage;
-    } else if (relapseCount >= 1) {
-      targetStage = Math.max(targetStage, 2) as NudgeStage;
-    }
+    const isRapidRelapse =
+      lastClosedAt !== null &&
+      lastClosedMaxStage >= 1 &&
+      now - lastClosedAt <= RELAPSE_WINDOW_MS;
+    const targetStage = isRapidRelapse
+      ? (Math.max(elapsedStage, 2) as NudgeStage)
+      : elapsedStage;
 
     maxStageReached = Math.max(maxStageReached, targetStage) as NudgeStage;
 

@@ -150,7 +150,7 @@ export interface ClassificationTickPayload {
   sessionId: string;
   timestamp: string; // ISO 8601
   signalType: "native" | "browser" | "vision";
-  classification: "on_task" | "distraction" | "drift" | "ambiguous";
+  classification: "on_task" | "distraction" | "drift" | "ambiguous" | "paused";
 }
 
 export interface NudgeTriggerPayload {

@@ -6,10 +6,11 @@ import type { ClassificationEventForSummary, SessionStatsRow } from "./db";
 type Bucket = "onTask" | "distracted" | "ambiguous";
 
 function bucketFor(
-  classification: "on_task" | "distraction" | "drift" | "ambiguous",
-): Bucket {
+  classification: "on_task" | "distraction" | "drift" | "ambiguous" | "paused",
+): Bucket | null {
   if (classification === "on_task") return "onTask";
   if (classification === "ambiguous") return "ambiguous";
+  if (classification === "paused") return null;
   return "distracted"; // "distraction" | "drift"
 }
 
@@ -66,7 +67,8 @@ export function computeClassificationBreakdown(
     startedAt,
     endedAt,
   )) {
-    totals[bucketFor(event.classification)] += durationMs;
+    const bucket = bucketFor(event.classification);
+    if (bucket !== null) totals[bucket] += durationMs;
   }
 
   return {
@@ -137,6 +139,7 @@ export function computeCategoryBreakdown(
     startedAt,
     endedAt,
   )) {
+    if (event.classification === "paused") continue;
     const label = extractCategoryLabel(event.rawSignal);
     totalsByLabelMs.set(label, (totalsByLabelMs.get(label) ?? 0) + durationMs);
   }
