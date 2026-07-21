@@ -12,6 +12,27 @@ plus a rolling seven-day trends view.
 
 Full product spec: [`docs/PRD.md`](docs/PRD.md).
 
+## Built with Codex and GPT-5.6
+
+[Codex](https://developers.openai.com/codex/overview) was used as a coding
+partner throughout Perch's development. It accelerated codebase exploration,
+architecture decisions, implementation, debugging, regression tests, and the
+documentation that keeps the Electron app, Chrome extension, and local data
+model aligned. The product decisions still stayed intentional, especially
+around privacy, mascot tone, and when AI should be involved.
+
+Perch also uses **GPT-5.6** in the product itself, but only for vision
+escalation. Local app and browser signals are checked first. If an identifiable
+activity remains genuinely ambiguous for 60 seconds, Perch sends the active
+window screenshot, declared task, and distraction list to the OpenAI Responses
+API for a strict `on_task`, `distraction`, or `drift` classification. The
+screenshot is never saved to disk. This keeps most checks local while giving
+Perch a better read when simple rules are not enough.
+
+For task-aware mascot-message variations, Perch uses GPT-5 mini once at the
+start of a session. Custom mascot images are generated separately with Gemini
+Nano Banana Pro.
+
 ## How it works, briefly
 
 - **Electron main process** has the only OS access: active-window polling
