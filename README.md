@@ -56,7 +56,7 @@ small bit of flavor, never a replacement for the focus cue.
 
 - **Generate your own mascot from any photo — opt-in, not required.**
   Upload a photo of yourself, a pet, a drawing, honestly anything, and it's
-  converted through OpenAI's image model into a matching retro pixel-art
+  converted through Gemini's Nano Banana Pro image model into a matching retro pixel-art
   sprite set: one image for each nudge stage (calm / gentle / upset /
   breaking-down). A few things this pipeline specifically handles, learned
   from actually generating a lot of these:
@@ -123,7 +123,8 @@ report those permissions as granted and haven't been verified end-to-end.
 
    | Variable            | Required? | Purpose |
    | ------------------- | --------- | ------- |
-   | `OPENAI_API_KEY`    | Optional  | Enables vision escalation for ambiguous activity, one task-aware nudge-fragment pack per session, and opt-in custom mascot photo generation. Without it, the app still runs with the bundled mascot and static nudge fragments, but ambiguous activity remains ambiguous and photo generation is unavailable. Get one at [platform.openai.com](https://platform.openai.com/api-keys). |
+   | `OPENAI_API_KEY`    | Optional  | Enables vision escalation for ambiguous activity and one task-aware nudge-fragment pack per session. Without it, ambiguous activity remains ambiguous and Perch uses static nudge fragments. Get one at [platform.openai.com](https://platform.openai.com/api-keys). |
+   | `GEMINI_API_KEY`    | Optional  | Enables opt-in custom mascot photo generation with Nano Banana Pro. Without it, the bundled mascot remains available. Get one at [Google AI Studio](https://aistudio.google.com/app/apikey). |
    | `WS_PORT`           | Not currently used | Reserved for the local WebSocket port. The app and extension currently use hardcoded port `8743`, so setting this has no effect yet. |
 
    `.env` is gitignored — never commit it.
@@ -179,8 +180,10 @@ OpenAI using your key:
 - A screenshot of the active window, the declared task, and the user's
   distraction list only after activity remains ambiguous long enough to
   reach vision escalation. Screenshots are never saved to disk.
-- The photo supplied by the user only when they explicitly generate a custom
-  mascot from it.
+
+When `GEMINI_API_KEY` is configured, Perch sends the photo supplied by the
+user directly to Gemini only when they explicitly generate a custom mascot
+from it.
 
 Browser URL/title signals, session history, saved mascot sprites, and
 session summaries stay local. See `docs/PRD.md` for the full non-goals list.

@@ -101,7 +101,7 @@ Response:
 
 ### `mascot:getKeyStatus`
 
-Whether `OPENAI_API_KEY` is set in the environment (per `docs/mascot-generation.md` §9 — no in-app settings form). The renderer uses this to decide whether to show the "Customize mascot" flow or an instruction to add the key and restart.
+Whether `GEMINI_API_KEY` is set in the environment (per `docs/mascot-generation.md` §9 — no in-app settings form). The renderer uses this to decide whether to show the "Customize mascot" flow or an instruction to add the key and restart.
 
 Request: `{}`
 Response: `{ hasKey: boolean }`

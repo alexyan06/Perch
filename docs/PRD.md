@@ -54,7 +54,7 @@ This tool sits between those two: it knows what you said you're working on, watc
 │   - local WebSocket server (port 8743) ← extension connects  │
 │   - better-sqlite3      → session/event log storage          │
 │   - vision API client   → tier-1 vision escalation only      │
-│   - OpenAI image client → opt-in custom mascot generation    │
+│   - Gemini image client → opt-in custom mascot generation    │
 │                                                               │
 │  Renderer process (React + TS + Tailwind + shadcn/ui):       │
 │   - Session start screen (task + distraction/approved lists)│
@@ -75,7 +75,7 @@ This tool sits between those two: it knows what you said you're working on, watc
                           │
                           ▼
      ┌──────────────────────────┐   ┌───────────────────────────┐
-     │ OpenAI vision API (cloud)│   │ OpenAI image API (cloud)  │
+     │ OpenAI vision API (cloud)│   │ Gemini image API (cloud)  │
      │  - text classification   │   │  - custom mascot pixel-art│
      │  - vision escalation     │   │    generation (opt-in)    │
      └──────────────────────────┘   └───────────────────────────┘
@@ -159,7 +159,7 @@ The active-session UI is a small, always-on-top mascot window pinned to a screen
 
 ### 6.7 Custom Mascot Generation (Opt-In)
 
-On top of the default mascot (§6.6), users can generate their own: upload a photo of anything reasonable (themselves, a pet, a drawing), and it's converted via OpenAI's image model into a matching pixel-art sprite set — one image per nudge stage — that then drives the same mascot window, no changes to the nudge state machine itself. One-time setup, not part of the per-session core loop. Strictly opt-in — the app is fully functional out of the box with the bundled default mascot and no OpenAI key configured.
+On top of the default mascot (§6.6), users can generate their own: upload a photo of anything reasonable (themselves, a pet, a drawing), and it's converted via Gemini's Nano Banana Pro image model into a matching pixel-art sprite set — one image per nudge stage — that then drives the same mascot window, no changes to the nudge state machine itself. One-time setup, not part of the per-session core loop. Strictly opt-in — the app is fully functional out of the box with the bundled default mascot and no Gemini key configured.
 
 Full design — prompt strategy, cross-image consistency approach, model choice and reasoning, IPC shapes: `docs/mascot-generation.md`.
 
@@ -199,5 +199,5 @@ distraction_intervals
 ## 10. Open Risks to Watch During Build
 
 - False-positive rate on drift detection without an override — primary thing to monitor once using it daily. Gets more important, not less, now that escalation is faster (§6.3/§6.4).
-- OpenAI API cost per session if ambiguous cases (e.g. unrecognized apps) are more common than expected. Each vision/image call still logs its own model and latency to the console per-call (`vision-client.ts`, `openai-image-client.ts`), but a per-session cost rollup in the UI was explicitly decided against — not worth building for a single-user local tool.
+- OpenAI API cost per session if ambiguous cases (e.g. unrecognized apps) are more common than expected, plus Gemini image-generation cost when users opt into custom mascots. Each vision/image call still logs its own model and latency to the console per-call (`vision-client.ts`, `openai-image-client.ts`), but a per-session cost rollup in the UI was explicitly decided against — not worth building for a single-user local tool.
 - ~~Extension ↔ Electron WebSocket reliability (reconnect logic if the Electron app restarts while the browser stays open).~~ Investigated 2026-07-08: the extension's own reconnect logic (retry every 5s) was already correct. The real bug was upstream — `ws-server.ts` kept serving a stale cached tab signal after a disconnect, which fed vision escalation a window title that no longer matched anything by the time it tried to screenshot, silently masquerading as a Screen Recording permission problem. Fixed (cache clears on disconnect); full writeup in `.codex/skills/activity-classification/SKILL.md`.

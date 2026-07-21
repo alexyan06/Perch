@@ -249,7 +249,7 @@ export function MascotSetup({ onBack }: Props): React.JSX.Element {
 
         {step === "noKey" && (
           <p className="text-sm text-muted-foreground">
-            Add <code className="text-foreground">OPENAI_API_KEY</code> to your{" "}
+            Add <code className="text-foreground">GEMINI_API_KEY</code> to your{" "}
             <code className="text-foreground">.env</code> file at the project
             root, then restart the app.
           </p>

@@ -198,7 +198,7 @@ ipcMain.handle(
 ipcMain.handle(
   "mascot:getKeyStatus",
   (): MascotGetKeyStatusResponse => ({
-    hasKey: process.env["OPENAI_API_KEY"] !== undefined,
+    hasKey: process.env["GEMINI_API_KEY"] !== undefined,
   }),
 );
 

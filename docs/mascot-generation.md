@@ -44,7 +44,7 @@ later from a "Customize Mascot" settings entry.
    `.codex`'s architecture rule), returns a preview to the renderer. The
    source photo is held in main only, never persisted.
 2. **Generate base sprite** — renderer calls `mascot:generateBase`. Main sends
-   the photo to OpenAI's image model (`gpt-image-2`) with the fixed prompt
+   the photo to Gemini's Nano Banana Pro model (`gemini-3-pro-image`) with the fixed prompt
    template (§4), gets back a calm/neutral pixel sprite, runs it through the
    deterministic post-process pass (§5), and returns the result. This becomes
    the **stage-0 reference image** every later generation is chained from.
@@ -55,7 +55,7 @@ later from a "Customize Mascot" settings entry.
    more calls, each passing the **approved base sprite plus any other
    already-approved stage sprites** back in as character reference images
    (not the original photo), with a stage-specific emotion prompt.
-   OpenAI's image-edit API accepts multiple reference images per call — using
+   Gemini's image-generation API accepts multiple reference images per call — using
    every previously-approved sprite as a reference, not just the base alone,
    reinforces consistency further than chaining off a single image would. By
    the time the hello wave generates: references = [base, gentle, upset, breakdown].
@@ -254,17 +254,17 @@ Response: `{ calm: string; gentle: string; upset: string; breakdown: string; hel
 ## 9. Provider & API Key Handling
 
 The image and vision clients are separate modules because they use different
-OpenAI endpoints, but both use the same `OPENAI_API_KEY`. This keeps the
-vision-classification and image-generation request shapes isolated without
-requiring a second provider or key.
+providers and keys: OpenAI handles vision classification, while Gemini handles
+optional mascot generation.
 
-**Model: `gpt-image-2`.** The client uses its image-edit endpoint: the source
-photo is the base-sprite reference, and every later stage supplies the earlier
-sprites as reference images. Output is requested as a 1024×1024 PNG at low
-quality before deterministic sprite post-processing.
+**Model: Nano Banana Pro (`gemini-3-pro-image`).** The client uses Gemini's
+Interactions API: the source photo is the base-sprite reference, and every
+later stage supplies the earlier sprites as reference images. Output is
+requested as a square 1K JPEG before deterministic sprite post-processing,
+which converts it into Perch's PNG sprite assets.
 
-Since this repo is public, anyone cloning it supplies their own OpenAI key:
-an `OPENAI_API_KEY` entry in `.env` (gitignored, never committed, never a
+Since this repo is public, anyone cloning it supplies their own Gemini key:
+a `GEMINI_API_KEY` entry in `.env` (gitignored, never committed, never a
 shared default). No settings UI for entering it — this is a
 personal/developer project distributed by cloning a repo, not a packaged app
 for non-technical end users. `mascot:getKeyStatus` checks whether that env var
@@ -274,13 +274,13 @@ and restart the app rather than offering an in-app form.
 ## 10. Fallback Default Mascot
 
 A bundled default pixel-art sprite set ships with the app so it's fully
-functional out of the box with no OpenAI key and no photo uploaded. Custom
+functional out of the box with no Gemini key and no photo uploaded. Custom
 mascot generation is strictly opt-in on top of that default, never a
 requirement to run the app.
 
 ## 11. Error Handling / Edge Cases
 
-- No OpenAI key configured → "Customize Mascot" entry point explains what's
+- No Gemini key configured → "Customize Mascot" entry point explains what's
   needed and links to where to add it; app keeps using the default mascot.
 - Generation call fails (network/API error) → surface the error, offer retry.
 - Model refuses (safety filter) → surface the refusal, let the user pick a

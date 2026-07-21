@@ -1,18 +1,5 @@
-import OpenAI, { toFile } from "openai";
-
-let client: OpenAI | null = null;
-
-function getClient(): OpenAI {
-  if (client) return client;
-  const apiKey = process.env["OPENAI_API_KEY"];
-  if (apiKey === undefined) {
-    throw new Error("[openai-image-client] OPENAI_API_KEY is not set");
-  }
-  client = new OpenAI({ apiKey });
-  return client;
-}
-
-const BASE_MODEL = "gpt-image-2";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
+const IMAGE_MODEL = "gemini-3-pro-image";
 const CANVAS_SIZE = 64;
 const PALETTE_SIZE = 24;
 
@@ -52,41 +39,84 @@ export interface GeneratedSprite {
 
 type ImageReference = { mimeType: string; data: string };
 
+interface GeminiInteractionResponse {
+  error?: { message?: string };
+  steps?: Array<{
+    content?: Array<{
+      type?: string;
+      data?: string;
+      mime_type?: string;
+    }>;
+  }>;
+}
+
+export function parseGeneratedSprite(
+  response: GeminiInteractionResponse,
+): GeneratedSprite {
+  const images = response.steps
+    ?.flatMap((step) => step.content ?? [])
+    .filter(
+      (content): content is { type: "image"; data: string; mime_type?: string } =>
+        content.type === "image" &&
+        typeof content.data === "string" &&
+        content.data.length > 0,
+    );
+  const image = images?.at(-1);
+  if (image === undefined) {
+    throw new Error("[gemini-image-client] response did not contain an image");
+  }
+  return { imageBase64: image.data, mimeType: image.mime_type ?? "image/png" };
+}
+
 async function runImageEdit(
   logLabel: string,
   prompt: string,
   references: ImageReference[],
 ): Promise<GeneratedSprite> {
-  const start = Date.now();
-  const images = await Promise.all(
-    references.map((reference, index) =>
-      toFile(
-        Buffer.from(reference.data, "base64"),
-        `reference-${index}.png`,
-        { type: reference.mimeType },
-      ),
-    ),
-  );
-  const response = await getClient().images.edit({
-    model: BASE_MODEL,
-    image: images,
-    prompt,
-    size: "1024x1024",
-    quality: "low",
-    output_format: "png",
-  });
-
-  console.log(`[openai-image-client] ${logLabel} call`, {
-    model: BASE_MODEL,
-    latencyMs: Date.now() - start,
-  });
-
-  const imageBase64 = response.data?.[0]?.b64_json;
-  if (imageBase64 === undefined) {
-    throw new Error(`[openai-image-client] no image returned from ${logLabel}`);
+  const apiKey = process.env["GEMINI_API_KEY"];
+  if (apiKey === undefined || apiKey.trim().length === 0) {
+    throw new Error("[gemini-image-client] GEMINI_API_KEY is not set");
   }
 
-  return { imageBase64, mimeType: "image/png" };
+  const start = Date.now();
+  const response = await fetch(GEMINI_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey,
+    },
+    body: JSON.stringify({
+      model: IMAGE_MODEL,
+      input: [
+        { type: "text", text: prompt },
+        ...references.map((reference) => ({
+          type: "image",
+          mime_type: reference.mimeType,
+          data: reference.data,
+        })),
+      ],
+      response_format: {
+        type: "image",
+        // Nano Banana Pro's Interactions endpoint currently supports JPEG
+        // output only. postProcessSprite converts it to Perch's PNG assets.
+        mime_type: "image/jpeg",
+        aspect_ratio: "1:1",
+        image_size: "1K",
+      },
+    }),
+  });
+  const body = (await response.json()) as GeminiInteractionResponse;
+  if (!response.ok) {
+    throw new Error(
+      `[gemini-image-client] ${logLabel} failed: ${body.error?.message ?? response.statusText}`,
+    );
+  }
+
+  console.log(`[gemini-image-client] ${logLabel} call`, {
+    model: IMAGE_MODEL,
+    latencyMs: Date.now() - start,
+  });
+  return parseGeneratedSprite(body);
 }
 
 export async function generateBaseSprite(params: {
