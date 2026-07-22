@@ -33,7 +33,7 @@ For task-aware mascot-message variations, Perch uses GPT-5 mini once at the
 start of a session. Custom mascot images are generated separately with Gemini
 Nano Banana Pro.
 
-## How it works, briefly
+## How it works
 
 - **Electron main process** has the only OS access: active-window polling
   (`active-win`), idle detection (`powerMonitor`), screenshots
